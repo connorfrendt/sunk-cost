@@ -1,0 +1,18 @@
+{
+  "name": "phaser-jam-starter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "zip": "npm run build && cd dist && zip -r ../itch-build.zip . && cd .."
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  }
+}

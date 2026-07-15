@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Jam Game</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #0e0e12;
+      height: 100%;
+      overflow: hidden;
+    }
+    #game-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      width: 100vw;
+    }
+    canvas {
+      image-rendering: pixelated; /* crisp scaling for pixel art; remove if using vector art */
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

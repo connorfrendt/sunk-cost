@@ -1,0 +1,4 @@
+node_modules
+dist
+itch-build.zip
+.DS_Store
