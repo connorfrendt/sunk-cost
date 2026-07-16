@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import Player from './Player.js';
+import Enemy from './Enemy.js';
 
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -16,17 +17,16 @@ class GameScene extends Phaser.Scene {
     create() {
         this.input.mouse.disableContextMenu();
         this.player = new Player(this, 320, 180);
+        this.spawnEnemy(300, 200, {});
 
         // this.blob = this.add.circle(320, 180, 16, 0x4ade80);
         this.anims.create({ key: 'ninja-idle-left', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 8, end: 15 }), frameRate: 4, repeat: -1 });
         this.anims.create({ key: 'ninja-idle-right', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 0, end: 7 }), frameRate: 4, repeat: -1 });
         this.player.sprite.play('ninja-idle-right');
-
-        
         
         this.physics.add.existing(this.player.sprite);
-        this.player.sprite.body.setSize(32, 32);
-        // this.player.sprite.body.setOffset();
+        this.player.sprite.body.setSize(25, 32);
+        
         this.player.sprite.body.setCollideWorldBounds(true);
         
         this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
@@ -56,7 +56,14 @@ class GameScene extends Phaser.Scene {
         this.player.sprite.body.setVelocityX(0);
         const speed = 250;
 
-        // // Movement
+        // Player Health Bar
+        this.player.hpBarBg.x = this.player.sprite.x;
+        this.player.hpBarBg.y = this.player.sprite.y - 28;
+        this.player.hpBar.x = this.player.sprite.x - 20;
+        this.player.hpBar.y = this.player.sprite.y - 28;
+        
+
+        // Movement
         if(this.cursors.left.isDown || this.wasd.A.isDown) {
             this.player.sprite.play('ninja-idle-left', true);
             this.player.sprite.body.setVelocityX(-speed);
@@ -68,6 +75,11 @@ class GameScene extends Phaser.Scene {
         if(Phaser.Input.Keyboard.JustDown(this.spaceKey) && this.player.sprite.body.blocked.down) {
             this.player.sprite.body.setVelocityY(-750);
         }
+    }
+
+    spawnEnemy(x, y, config) {
+        const enemy = new Enemy(this, x, y, config);
+        return enemy;
     }
 }
 
@@ -86,7 +98,7 @@ const config = {
         default: 'arcade',
         arcade: {
             gravity: { y: 2000 },
-            debug: false,
+            debug: true,
         }
     },
     scene: GameScene,
