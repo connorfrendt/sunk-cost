@@ -7,7 +7,8 @@ export default class Enemy {
         this.attackDamage = config.attackDamage || 10;
 
         // Visual
-        this.squareEnemy = scene.add.rectangle(200, 200, 32, 32, 0x440000);
+        this.sprite = scene.add.sprite(x, y, 'enemy-idle', 0);
+        this.sprite.play('enemy-idle-right');
 
         // HP Bar
         this.hpBarBg = scene.add.rectangle(x, y - 28, 40, 6, 0x440000);
@@ -15,15 +16,18 @@ export default class Enemy {
         this.hpBar.setOrigin(0, 0.5);
         this.hp = config.hp;
         this.maxHp = config.maxHp;
+
+        // Stats
+        this.alive = true;
     }
 
     tryAttack(player, delta) {
-        // console.log('DELTA', delta);
-        // if(!this.alive) {
-        //     return;
-        // }
+        if(!this.alive) {
+            return;
+        }
+
         const distance = Phaser.Math.Distance.Between(
-            this.squareEnemy.x, this.squareEnemy.y,
+            this.sprite.x, this.sprite.y,
             player.sprite.x, player.sprite.y
         );
         
@@ -31,7 +35,6 @@ export default class Enemy {
             this.attackCooldown -= delta;
             
             if(this.attackCooldown <= 0) {
-                console.log('here', this.attackDamage);
                 player.takeDamage(this.attackDamage);
                 this.attackCooldown = this.attackInterval;
             }
@@ -44,6 +47,11 @@ export default class Enemy {
     takeDamage(amount, source) {
         this.hp -= amount;
         this.updateHpBar();
+
+        if(this.hp <= 0) {
+            this.die();
+            return;
+        }
     }
 
     updateHpBar() {
@@ -51,12 +59,27 @@ export default class Enemy {
         this.hpBar.scaleX = pct;
     }
 
+    die() {
+        this.alive = false;
+        this.sprite.stop();
+        this.sprite.destroy();
+        this.hpBar.setVisible(false);
+        this.hpBarBg.setVisible(false);
+    }
+
+    destroy() {
+        // this.sprite.destroy();
+        this.hpBar.destroy();
+        this.hpBarBg.destroy();
+        // this.nameText.destroy();
+    }
+
     syncVisuals() {
-        this.hpBarBg.x = this.squareEnemy.x;
-        this.hpBarBg.y = this.squareEnemy.y - 28;
-        this.hpBar.x = this.squareEnemy.y - 20;
-        this.hpBar.y = this.squareEnemy.y - 28;
-        // this.nameText.x = this.squareEnemy.x - this.nameText.width / 2;
-        // this.nameText.y = this.squareEnemy.y - 40;
+        this.hpBarBg.x = this.sprite.x;
+        this.hpBarBg.y = this.sprite.y - 28;
+        this.hpBar.x = this.sprite.x - 20;
+        this.hpBar.y = this.sprite.y - 28;
+        // this.nameText.x = this.sprite.x - this.nameText.width / 2;
+        // this.nameText.y = this.sprite.y - 40;
     }
 }

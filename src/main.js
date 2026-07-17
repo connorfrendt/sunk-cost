@@ -12,24 +12,34 @@ class GameScene extends Phaser.Scene {
             frameWidth: 96,
             frameHeight: 96,
         });
+        this.load.spritesheet('enemy-idle', '/assets/characters/enemeanie-idle.png', {
+            frameWidth: 96,
+            frameHeight: 96,
+        });
     }
 
     create() {
         this.input.mouse.disableContextMenu();
         this.player = new Player(this, 320, 180);
-        this.enemy = this.spawnEnemy(300, 200, {
-            name: 'Enemeanie',
-            hp: 150,
-            maxHp: 150,
-        });
 
         // Animation Creation
         this.anims.create({ key: 'ninja-idle-left', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 8, end: 15 }), frameRate: 4, repeat: -1 });
         this.anims.create({ key: 'ninja-idle-right', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 0, end: 7 }), frameRate: 4, repeat: -1 });
-        this.player.sprite.play('ninja-idle-right');
         
+        this.anims.create({ key: 'enemy-idle-left', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 6, end: 11 }), frameRate: 3, repeat: -1 });
+        this.anims.create({ key: 'enemy-idle-right', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 0, end: 5 }), frameRate: 3, repeat: -1 });
+
+        this.player.sprite.play('ninja-idle-right');
+
+        this.enemies = [];
+        this.enemy = this.spawnEnemy(100, 300, {
+            name: 'Enemeanie',
+            hp: 30,
+            maxHp: 30,
+        });
+
         this.physics.add.existing(this.player.sprite);
-        this.player.sprite.body.setSize(25, 32);
+        // this.player.sprite.body.setSize(25, 32);
         
         this.player.sprite.body.setCollideWorldBounds(true);
         
@@ -102,10 +112,10 @@ class GameScene extends Phaser.Scene {
             // Attack
             if(this.attackRequested && this.attackCooldown <= 0) {
                 const attackRange = 60;
-                
+                // const aliveEnemies = this.enemies.filter(enemy => enemy.alive);
                 const distance = Phaser.Math.Distance.Between(
                     this.player.sprite.x, this.player.sprite.y,
-                    this.enemy.squareEnemy.x, this.enemy.squareEnemy.y
+                    this.enemy.sprite.x, this.enemy.sprite.y
                 );
 
                 if(distance <= attackRange) {
@@ -128,6 +138,7 @@ class GameScene extends Phaser.Scene {
 
     spawnEnemy(x, y, config) {
         const enemy = new Enemy(this, x, y, config);
+        this.enemies.push(enemy);
         return enemy;
     }
 
@@ -148,7 +159,7 @@ const config = {
         default: 'arcade',
         arcade: {
             gravity: { y: 2000 },
-            debug: false,
+            debug: true,
         }
     },
     scene: GameScene,
