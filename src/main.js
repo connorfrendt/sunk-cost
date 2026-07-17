@@ -17,9 +17,13 @@ class GameScene extends Phaser.Scene {
     create() {
         this.input.mouse.disableContextMenu();
         this.player = new Player(this, 320, 180);
-        this.spawnEnemy(300, 200, {});
+        this.enemy = this.spawnEnemy(300, 200, {
+            name: 'Enemeanie',
+            hp: 30,
+            maxHp: 30,
+        });
 
-        // this.blob = this.add.circle(320, 180, 16, 0x4ade80);
+        // Animation Creation
         this.anims.create({ key: 'ninja-idle-left', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 8, end: 15 }), frameRate: 4, repeat: -1 });
         this.anims.create({ key: 'ninja-idle-right', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 0, end: 7 }), frameRate: 4, repeat: -1 });
         this.player.sprite.play('ninja-idle-right');
@@ -61,7 +65,9 @@ class GameScene extends Phaser.Scene {
         this.player.hpBarBg.y = this.player.sprite.y - 28;
         this.player.hpBar.x = this.player.sprite.x - 20;
         this.player.hpBar.y = this.player.sprite.y - 28;
-        
+
+        // Enemy Health Bar/Visuals
+        this.enemy.syncVisuals();
 
         // Movement
         if(this.cursors.left.isDown || this.wasd.A.isDown) {
@@ -72,15 +78,20 @@ class GameScene extends Phaser.Scene {
             this.player.sprite.play('ninja-idle-right', true);
             this.player.sprite.body.setVelocityX(speed);
         }
-        if(Phaser.Input.Keyboard.JustDown(this.spaceKey) && this.player.sprite.body.blocked.down) {
+        if((Phaser.Input.Keyboard.JustDown(this.spaceKey) || this.cursors.up.isDown) && this.player.sprite.body.blocked.down) {
             this.player.sprite.body.setVelocityY(-750);
         }
+
+        // Enemy AI
+
+        this.enemy.tryAttack(this.player, this.game.loop.delta);
     }
 
     spawnEnemy(x, y, config) {
         const enemy = new Enemy(this, x, y, config);
         return enemy;
     }
+
 }
 
 const config = {
@@ -98,7 +109,7 @@ const config = {
         default: 'arcade',
         arcade: {
             gravity: { y: 2000 },
-            debug: true,
+            debug: false,
         }
     },
     scene: GameScene,

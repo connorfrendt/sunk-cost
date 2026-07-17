@@ -17,4 +17,27 @@ export default class Player {
         this.hpBar = scene.add.rectangle(x - 20, y - 28, 40, 6, 0x00ff00);
         this.hpBar.setOrigin(0, 0.5);
     }
+
+    takeDamage(amount) {
+        if(!this.alive) {
+            return;
+        }
+        if(this.invulnerable) {
+            return;
+        }
+        
+        this.hp -= amount;
+
+        if(this.hp <= 0) {
+            this.hp = 0;
+            // this.die();
+        }
+
+        this.updateHpBar();
+    }
+
+    updateHpBar() {
+        const pct = this.hp / this.maxHp;
+        this.hpBar.scaleX = pct;
+    }
 }
