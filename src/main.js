@@ -19,8 +19,8 @@ class GameScene extends Phaser.Scene {
         this.player = new Player(this, 320, 180);
         this.enemy = this.spawnEnemy(300, 200, {
             name: 'Enemeanie',
-            hp: 30,
-            maxHp: 30,
+            hp: 150,
+            maxHp: 150,
         });
 
         // Animation Creation
@@ -54,6 +54,16 @@ class GameScene extends Phaser.Scene {
         this.cursors = this.input.keyboard.createCursorKeys();
         this.wasd = this.input.keyboard.addKeys('W,A,S,D');
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        this.xKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
+
+        // Basic Attack
+        this.attackRequested = false
+        this.attackCooldown = 0;
+        this.attackCooldownDuration = 500; // ms
+
+        this.input.keyboard.on('keydown-X', () => {
+            this.attackRequested = true;
+        });
     }
 
     update() {
@@ -69,21 +79,50 @@ class GameScene extends Phaser.Scene {
         // Enemy Health Bar/Visuals
         this.enemy.syncVisuals();
 
-        // Movement
-        if(this.cursors.left.isDown || this.wasd.A.isDown) {
-            this.player.sprite.play('ninja-idle-left', true);
-            this.player.sprite.body.setVelocityX(-speed);
+        if(this.player.alive) {
+
+            // Movement
+            if(this.cursors.left.isDown || this.wasd.A.isDown) {
+                this.player.sprite.play('ninja-idle-left', true);
+                this.player.sprite.body.setVelocityX(-speed);
+            }
+            if(this.cursors.right.isDown || this.wasd.D.isDown) {
+                this.player.sprite.play('ninja-idle-right', true);
+                this.player.sprite.body.setVelocityX(speed);
+            }
+            if((Phaser.Input.Keyboard.JustDown(this.spaceKey) || this.cursors.up.isDown) && this.player.sprite.body.blocked.down) {
+                this.player.sprite.body.setVelocityY(-750);
+            }
+
+            // Attack Cooldown Tick
+            if(this.attackCooldown > 0) {
+                this.attackCooldown -= this.game.loop.delta;
+            }
+
+            // Attack
+            if(this.attackRequested && this.attackCooldown <= 0) {
+                const attackRange = 60;
+                
+                const distance = Phaser.Math.Distance.Between(
+                    this.player.sprite.x, this.player.sprite.y,
+                    this.enemy.squareEnemy.x, this.enemy.squareEnemy.y
+                );
+
+                if(distance <= attackRange) {
+                    this.enemy.takeDamage(10, this.player.sprite);
+                }
+
+                this.attackCooldown = this.attackCooldownDuration;
+            }
+
+            this.attackRequested = false;
+
+
         }
-        if(this.cursors.right.isDown || this.wasd.D.isDown) {
-            this.player.sprite.play('ninja-idle-right', true);
-            this.player.sprite.body.setVelocityX(speed);
-        }
-        if((Phaser.Input.Keyboard.JustDown(this.spaceKey) || this.cursors.up.isDown) && this.player.sprite.body.blocked.down) {
-            this.player.sprite.body.setVelocityY(-750);
-        }
+
+        // Next -> Get the attacking logic in and see if it works
 
         // Enemy AI
-
         this.enemy.tryAttack(this.player, this.game.loop.delta);
     }
 

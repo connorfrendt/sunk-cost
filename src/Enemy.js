@@ -13,6 +13,8 @@ export default class Enemy {
         this.hpBarBg = scene.add.rectangle(x, y - 28, 40, 6, 0x440000);
         this.hpBar = scene.add.rectangle(x - 20, y - 28, 40, 6, 0x00ff00);
         this.hpBar.setOrigin(0, 0.5);
+        this.hp = config.hp;
+        this.maxHp = config.maxHp;
     }
 
     tryAttack(player, delta) {
@@ -39,8 +41,13 @@ export default class Enemy {
         }
     }
 
+    takeDamage(amount, source) {
+        this.hp -= amount;
+        this.updateHpBar();
+    }
+
     updateHpBar() {
-        const pct = Math.max(this.hpBar, 0) / this.maxHp;
+        const pct = Math.max(this.hp, 0) / this.maxHp;
         this.hpBar.scaleX = pct;
     }
 
