@@ -25,6 +25,10 @@ class GameScene extends Phaser.Scene {
 
     create() {
         this.input.mouse.disableContextMenu();
+
+        this.zoomKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
+        this.debugZoomedOut = false;
+
         this.player = new Player(this, 320, 180);
 
         // Animation Creation
@@ -38,28 +42,35 @@ class GameScene extends Phaser.Scene {
         this.anims.create({ key: 'ninja-attack-right', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 3, end: 5 }), frameRate: 12, repeat: 0 });
 
         this.player.sprite.play('ninja-idle-right');
-
+        this.isAttacking = false;
         this.player.sprite.on('animationcomplete', (animation) => {
-            if(this.player.alive && animation.key === 'ninja-attack-left') {
-                this.player.sprite.play('ninja-idle-left', true);
-            }
-            if(this.player.alive && animation.key === 'ninja-attack-right') {
-                this.player.sprite.play('ninja-idle-right', true);
+            if(this.player.alive) {
+                
+                if(animation.key === 'ninja-attack-left') {
+                    this.isAttacking = false;
+                    this.player.sprite.play('ninja-idle-left', true);
+                }
+                if(animation.key === 'ninja-attack-right') {
+                    this.isAttacking = false;
+                    this.player.sprite.play('ninja-idle-right', true);
+                }
             }
         });
 
         this.enemies = [];
         this.enemy = this.spawnEnemy(100, 300, {
             name: 'Enemeanie',
-            hp: 30,
-            maxHp: 30,
+            hp: 100,
+            maxHp: 100,
         });
 
         this.physics.add.existing(this.player.sprite);
+        this.physics.add.existing(this.enemy.sprite);
         this.player.sprite.body.setSize(25, 32);
-        // this.player.sprite.body.setOffset(25, 32);
-        
+        this.enemy.sprite.body.setSize(32, 32);
+
         this.player.sprite.body.setCollideWorldBounds(true);
+        this.enemy.sprite.body.setCollideWorldBounds(true);
         
         this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
         this.physics.world.setBounds(0, 0, 3000, 3000);
@@ -75,8 +86,11 @@ class GameScene extends Phaser.Scene {
 
         // Collision physics
         this.physics.add.collider(this.player.sprite, this.platform);
+        this.physics.add.collider(this.enemy.sprite, this.platform);
         this.physics.add.collider(this.player.sprite, this.otherPlatform);
+        this.physics.add.collider(this.enemy.sprite, this.otherPlatform);
         this.physics.add.collider(this.player.sprite, this.anotherPlatform);
+        this.physics.add.collider(this.enemy.sprite, this.anotherPlatform);
 
         // Initialize the movement keys
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -88,6 +102,7 @@ class GameScene extends Phaser.Scene {
         this.attackRequested = false
         this.attackCooldown = 0;
         this.attackCooldownDuration = 500; // ms
+        
 
         this.input.keyboard.on('keydown-X', () => {
             this.attackRequested = true;
@@ -95,8 +110,11 @@ class GameScene extends Phaser.Scene {
     }
 
     update() {
-        
-        const speed = 250;
+        // For seeing rooms - TAKE OUT WHEN GOING LIVE: TODO
+        if(Phaser.Input.Keyboard.JustDown(this.zoomKey)) {
+            this.debugZoomedOut = !this.debugZoomedOut;
+            this.cameras.main.setZoom(this.debugZoomedOut ? 0.2 : 1);
+        }
 
         // Player Health Bar
         this.player.hpBarBg.x = this.player.sprite.x;
@@ -116,14 +134,20 @@ class GameScene extends Phaser.Scene {
 
                 // Movement
                 if(this.cursors.left.isDown || this.wasd.A.isDown) {
-                    this.player.sprite.play('ninja-idle-left', true);
+                    // this.player.sprite.play('ninja-idle-left', true);
                     this.player.lastDirectionFaced = 'left';
-                    this.player.sprite.body.setVelocityX(-speed);
+                    this.player.sprite.body.setVelocityX(-this.player.speed);
+                    if(!this.isAttacking) {
+                        this.player.sprite.play('ninja-idle-left', true);
+                    }
                 }
                 if(this.cursors.right.isDown || this.wasd.D.isDown) {
-                    this.player.sprite.play('ninja-idle-right', true);
+                    // this.player.sprite.play('ninja-idle-right', true);
                     this.player.lastDirectionFaced = 'right';
-                    this.player.sprite.body.setVelocityX(speed);
+                    this.player.sprite.body.setVelocityX(this.player.speed);
+                    if(!this.isAttacking) {
+                        this.player.sprite.play('ninja-idle-right', true);
+                    }
                 }
             }
             else {
@@ -131,10 +155,10 @@ class GameScene extends Phaser.Scene {
                 let targetVelocityX = this.player.sprite.body.velocity.x; // default: keep current momentum
                 
                 if(this.cursors.left.isDown || this.wasd.A.isDown) {
-                    targetVelocityX = -speed;
+                    targetVelocityX = -this.player.speed;
                 }
                 else if (this.cursors.right.isDown || this.wasd.D.isDown) {
-                    targetVelocityX = speed;
+                    targetVelocityX = this.player.speed;
                 }
 
                 const currentVelocityX = this.player.sprite.body.velocity.x;
@@ -154,20 +178,16 @@ class GameScene extends Phaser.Scene {
             
             // Attack
             if(this.attackRequested && this.attackCooldown <= 0) {
-                if(this.player.lastDirectionFaced === 'left') {
-                    this.player.sprite.play('ninja-attack-left');
-                }
-                if(this.player.lastDirectionFaced === 'right') {
-                    this.player.sprite.play('ninja-attack-right');
-                }
-                const attackRange = 60;
+                this.isAttacking = true;
+                this.player.sprite.play(this.player.lastDirectionFaced === 'left' ? 'ninja-attack-left' : 'ninja-attack-right', true);
+                
                 const aliveEnemies = this.enemies.filter(enemy => enemy.alive);
                 const distance = Phaser.Math.Distance.Between(
                     this.player.sprite.x, this.player.sprite.y,
                     this.enemy.sprite.x, this.enemy.sprite.y
                 );
 
-                if(distance <= attackRange) {
+                if(distance <= this.player.attackRange) {
                     this.enemy.takeDamage(10, this.player.sprite);
                 }
 
@@ -189,6 +209,73 @@ class GameScene extends Phaser.Scene {
         return enemy;
     }
 
+    showUpgradeChoice() {
+        const { width, height } = this.cameras.main;
+        const cardWidth = 180;
+        const cardHeight = 220;
+        const gap = 40;
+        const centerY = height / 2;
+
+        const cardData = [
+            { title: '+30 DAMAGE', desc: 'Adds +30 damage per hit' },
+            { title: 'TICKING DAMAGE', desc: '5 damage per second until the enemy dies' },
+        ];
+
+        const xPositions = [
+            width / 2 - cardWidth / 2 - gap / 2,
+            width / 2 + cardWidth / 2 + gap / 2,
+        ];
+
+        this.upgradeCards = xPositions.map((x, i) => {
+            const bg = this.add.rectangle(x, centerY, cardWidth, cardHeight, 0x2a2a3a)
+                .setStrokeStyle(2, 0x4a4a5a)
+                .setScrollFactor(0)
+                .setDepth(100)
+                .setInteractive({ useHandCursor: true });
+            
+            const title = this.add.text(x, centerY - 60, cardData[i].title, {
+                fontFamily: 'monospace',
+                fontSize: '16px',
+                color: '#fbbf24',
+                align: 'center',
+                wordWrap: {
+                    width: cardWidth - 20,
+                }
+            })
+                .setOrigin(0.5)
+                .setScrollFactor(0)
+                .setDepth(101);
+            
+            const desc = this.add.text(x, centerY + 10, cardData[i].desc, {
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                color: '#ffffff',
+                align: 'center',
+                wordWrap: {
+                    width: cardWidth - 20,
+                }
+            })
+                .setOrigin(0.5)
+                .setScrollFactor(0)
+                .setDepth(101);
+            
+            bg.on('pointerdown', () => this.chooseUpgrade(i));
+
+            return { bg, title, desc };
+        });
+    }
+
+    chooseUpgrade(index) {
+        console.log('Chose upgrade index: ', index);
+        this.upgradeCards.forEach(({ bg, title, desc }) => {
+            bg.destroy();
+            title.destroy();
+            desc.destroy();
+        });
+
+        this.upgradeCards = [];
+    }
+
 }
 
 const config = {
@@ -206,7 +293,7 @@ const config = {
         default: 'arcade',
         arcade: {
             gravity: { y: 2000 },
-            debug: false,
+            debug: true,
         }
     },
     scene: GameScene,

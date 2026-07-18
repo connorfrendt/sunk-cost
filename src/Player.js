@@ -5,9 +5,11 @@ export default class Player {
         // Stats
         this.hp = 100;
         this.maxHp = 100;
+        this.speed = 250;
         this.alive = true;
         this.invulnerable = false;
         this.abilities = [];
+        this.attackRange = 85;
         
         // Visual
         this.sprite = scene.add.sprite(x, y, 'ninja-idle', 0);

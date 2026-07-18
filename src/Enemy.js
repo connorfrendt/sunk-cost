@@ -69,6 +69,7 @@ export default class Enemy {
         this.destroy();
         this.hpBar.setVisible(false);
         this.hpBarBg.setVisible(false);
+        this.scene.showUpgradeChoice();
     }
 
     destroy() {
