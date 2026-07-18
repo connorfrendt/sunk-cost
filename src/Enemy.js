@@ -45,6 +45,10 @@ export default class Enemy {
     }
 
     takeDamage(amount, source) {
+        if(!this.alive) {
+            return;
+        }
+
         this.hp -= amount;
         this.updateHpBar();
 
@@ -62,7 +66,7 @@ export default class Enemy {
     die() {
         this.alive = false;
         this.sprite.stop();
-        this.sprite.destroy();
+        this.destroy();
         this.hpBar.setVisible(false);
         this.hpBarBg.setVisible(false);
     }

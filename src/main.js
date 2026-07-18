@@ -39,11 +39,14 @@ class GameScene extends Phaser.Scene {
 
         this.player.sprite.play('ninja-idle-right');
 
-        this.player.sprite.on('animationcomplete-ninja-attack-left', () => {
-            if(this.player.alive) {
+        this.player.sprite.on('animationcomplete', (animation) => {
+            if(this.player.alive && animation.key === 'ninja-attack-left') {
                 this.player.sprite.play('ninja-idle-left', true);
             }
-        })
+            if(this.player.alive && animation.key === 'ninja-attack-right') {
+                this.player.sprite.play('ninja-idle-right', true);
+            }
+        });
 
         this.enemies = [];
         this.enemy = this.spawnEnemy(100, 300, {
@@ -92,7 +95,7 @@ class GameScene extends Phaser.Scene {
     }
 
     update() {
-        this.player.sprite.body.setVelocityX(0);
+        
         const speed = 250;
 
         // Player Health Bar
@@ -105,16 +108,41 @@ class GameScene extends Phaser.Scene {
         this.enemy.syncVisuals();
 
         if(this.player.alive) {
+            const grounded = this.player.sprite.body.blocked.down;
+            const airControl = 0.10;
 
-            // Movement
-            if(this.cursors.left.isDown || this.wasd.A.isDown) {
-                this.player.sprite.play('ninja-idle-left', true);
-                this.player.sprite.body.setVelocityX(-speed);
+            if(grounded) {
+                this.player.sprite.body.setVelocityX(0);
+
+                // Movement
+                if(this.cursors.left.isDown || this.wasd.A.isDown) {
+                    this.player.sprite.play('ninja-idle-left', true);
+                    this.player.lastDirectionFaced = 'left';
+                    this.player.sprite.body.setVelocityX(-speed);
+                }
+                if(this.cursors.right.isDown || this.wasd.D.isDown) {
+                    this.player.sprite.play('ninja-idle-right', true);
+                    this.player.lastDirectionFaced = 'right';
+                    this.player.sprite.body.setVelocityX(speed);
+                }
             }
-            if(this.cursors.right.isDown || this.wasd.D.isDown) {
-                this.player.sprite.play('ninja-idle-right', true);
-                this.player.sprite.body.setVelocityX(speed);
+            else {
+                // Airborne: nudge toward the target speed instead of snapping to it
+                let targetVelocityX = this.player.sprite.body.velocity.x; // default: keep current momentum
+                
+                if(this.cursors.left.isDown || this.wasd.A.isDown) {
+                    targetVelocityX = -speed;
+                }
+                else if (this.cursors.right.isDown || this.wasd.D.isDown) {
+                    targetVelocityX = speed;
+                }
+
+                const currentVelocityX = this.player.sprite.body.velocity.x;
+                const newVelocityX = Phaser.Math.Linear(currentVelocityX, targetVelocityX, airControl);
+                this.player.sprite.body.setVelocityX(newVelocityX);
             }
+
+
             if((Phaser.Input.Keyboard.JustDown(this.spaceKey) || this.cursors.up.isDown) && this.player.sprite.body.blocked.down) {
                 this.player.sprite.body.setVelocityY(-750);
             }
@@ -126,9 +154,14 @@ class GameScene extends Phaser.Scene {
             
             // Attack
             if(this.attackRequested && this.attackCooldown <= 0) {
-                this.player.sprite.play('ninja-attack-left');
+                if(this.player.lastDirectionFaced === 'left') {
+                    this.player.sprite.play('ninja-attack-left');
+                }
+                if(this.player.lastDirectionFaced === 'right') {
+                    this.player.sprite.play('ninja-attack-right');
+                }
                 const attackRange = 60;
-                // const aliveEnemies = this.enemies.filter(enemy => enemy.alive);
+                const aliveEnemies = this.enemies.filter(enemy => enemy.alive);
                 const distance = Phaser.Math.Distance.Between(
                     this.player.sprite.x, this.player.sprite.y,
                     this.enemy.sprite.x, this.enemy.sprite.y
@@ -145,8 +178,6 @@ class GameScene extends Phaser.Scene {
 
 
         }
-
-        // Next -> Get the attacking logic in and see if it works
 
         // Enemy AI
         this.enemy.tryAttack(this.player, this.game.loop.delta);
@@ -175,7 +206,7 @@ const config = {
         default: 'arcade',
         arcade: {
             gravity: { y: 2000 },
-            debug: true,
+            debug: false,
         }
     },
     scene: GameScene,
