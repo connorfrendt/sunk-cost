@@ -8,9 +8,14 @@ class GameScene extends Phaser.Scene {
     }
 
     preload() {
+        // Ninja 
         this.load.spritesheet('ninja-idle', '/assets/characters/ninja-idle.png', {
-            frameWidth: 96,
-            frameHeight: 96,
+            frameWidth: 144,
+            frameHeight: 144,
+        });
+        this.load.spritesheet('ninja-attack', '/assets/characters/ninja-attack.png', {
+            frameWidth: 144,
+            frameHeight: 144,
         });
         this.load.spritesheet('enemy-idle', '/assets/characters/enemeanie-idle.png', {
             frameWidth: 96,
@@ -29,7 +34,16 @@ class GameScene extends Phaser.Scene {
         this.anims.create({ key: 'enemy-idle-left', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 6, end: 11 }), frameRate: 3, repeat: -1 });
         this.anims.create({ key: 'enemy-idle-right', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 0, end: 5 }), frameRate: 3, repeat: -1 });
 
+        this.anims.create({ key: 'ninja-attack-left', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 0, end: 2 }), frameRate: 12, repeat: 0 });
+        this.anims.create({ key: 'ninja-attack-right', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 3, end: 5 }), frameRate: 12, repeat: 0 });
+
         this.player.sprite.play('ninja-idle-right');
+
+        this.player.sprite.on('animationcomplete-ninja-attack-left', () => {
+            if(this.player.alive) {
+                this.player.sprite.play('ninja-idle-left', true);
+            }
+        })
 
         this.enemies = [];
         this.enemy = this.spawnEnemy(100, 300, {
@@ -39,7 +53,8 @@ class GameScene extends Phaser.Scene {
         });
 
         this.physics.add.existing(this.player.sprite);
-        // this.player.sprite.body.setSize(25, 32);
+        this.player.sprite.body.setSize(25, 32);
+        // this.player.sprite.body.setOffset(25, 32);
         
         this.player.sprite.body.setCollideWorldBounds(true);
         
@@ -108,9 +123,10 @@ class GameScene extends Phaser.Scene {
             if(this.attackCooldown > 0) {
                 this.attackCooldown -= this.game.loop.delta;
             }
-
+            
             // Attack
             if(this.attackRequested && this.attackCooldown <= 0) {
+                this.player.sprite.play('ninja-attack-left');
                 const attackRange = 60;
                 // const aliveEnemies = this.enemies.filter(enemy => enemy.alive);
                 const distance = Phaser.Math.Distance.Between(

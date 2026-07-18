@@ -68,7 +68,7 @@ export default class Enemy {
     }
 
     destroy() {
-        // this.sprite.destroy();
+        this.sprite.destroy();
         this.hpBar.destroy();
         this.hpBarBg.destroy();
         // this.nameText.destroy();

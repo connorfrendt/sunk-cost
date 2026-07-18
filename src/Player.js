@@ -11,6 +11,7 @@ export default class Player {
         
         // Visual
         this.sprite = scene.add.sprite(x, y, 'ninja-idle', 0);
+        this.sprite.setDepth(10);
 
         // HP Bar
         this.hpBarBg = scene.add.rectangle(x, y - 28, 40, 6, 0x440000);
