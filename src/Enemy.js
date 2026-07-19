@@ -9,6 +9,9 @@ export default class Enemy {
         // Visual
         this.sprite = scene.add.sprite(x, y, 'enemy-idle', 0);
         this.sprite.play('enemy-idle-right');
+        scene.physics.add.existing(this.sprite);
+        this.sprite.body.setSize(32, 32);
+        this.sprite.body.setCollideWorldBounds(true);
 
         // HP Bar
         this.hpBarBg = scene.add.rectangle(x, y - 28, 40, 6, 0x440000);
@@ -70,6 +73,8 @@ export default class Enemy {
         this.hpBar.setVisible(false);
         this.hpBarBg.setVisible(false);
         this.scene.showUpgradeChoice();
+        this.scene.removeEnemyFromArray(this);
+        this.scene.respawnEnemy();
     }
 
     destroy() {

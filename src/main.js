@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import Player from './Player.js';
 import Enemy from './Enemy.js';
+import { cardData } from './upgrades.js'
 
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -21,15 +22,26 @@ class GameScene extends Phaser.Scene {
             frameWidth: 96,
             frameHeight: 96,
         });
+        this.load.image('tile', '/assets/tilemaps/tile.png');
+        this.load.image('tile-small', '/assets/tilemaps/tile-small.png');
+        this.load.tilemapTiledJSON('tilemap', '/assets/tilemaps/tilemap.json');
     }
 
     create() {
+        const map = this.make.tilemap({ key: 'tilemap' });
+        const tilesetBig = map.addTilesetImage('tile', 'tile');
+        const tilesetSmall = map.addTilesetImage('tile-small', 'tile-small');
+
+        this.groundLayer = map.createLayer('Tile Layer 1', [tilesetBig, tilesetSmall], 0, 0);
+        this.groundLayer.setCollisionByProperty({ collides: true });
+
         this.input.mouse.disableContextMenu();
 
         this.zoomKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
         this.debugZoomedOut = false;
 
         this.player = new Player(this, 320, 180);
+        this.physics.add.collider(this.player.sprite, this.groundLayer);
 
         // Animation Creation
         this.anims.create({ key: 'ninja-idle-left', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 8, end: 15 }), frameRate: 4, repeat: -1 });
@@ -42,7 +54,7 @@ class GameScene extends Phaser.Scene {
         this.anims.create({ key: 'ninja-attack-right', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 3, end: 5 }), frameRate: 12, repeat: 0 });
 
         this.player.sprite.play('ninja-idle-right');
-        this.isAttacking = false;
+        
         this.player.sprite.on('animationcomplete', (animation) => {
             if(this.player.alive) {
                 
@@ -57,40 +69,27 @@ class GameScene extends Phaser.Scene {
             }
         });
 
+        // Spawn First Enemy
         this.enemies = [];
         this.enemy = this.spawnEnemy(100, 300, {
             name: 'Enemeanie',
-            hp: 100,
-            maxHp: 100,
+            hp: 50,
+            maxHp: 50,
         });
 
+        // Add physics to player/enemy
         this.physics.add.existing(this.player.sprite);
         this.physics.add.existing(this.enemy.sprite);
         this.player.sprite.body.setSize(25, 32);
-        this.enemy.sprite.body.setSize(32, 32);
-
         this.player.sprite.body.setCollideWorldBounds(true);
-        this.enemy.sprite.body.setCollideWorldBounds(true);
         
+        // Camera stuff
         this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
-        this.physics.world.setBounds(0, 0, 3000, 3000);
-        this.cameras.main.setBounds(0, 0, 3000, 3000);
-
-        // Random platforms for now
-        this.platform = this.add.rectangle(320, 344, 640, 32, 0x4a4a5a);
-        this.otherPlatform = this.add.rectangle(700, 200, 200, 100, 0x4a4a5a);
-        this.anotherPlatform = this.add.rectangle(600, 300, 200, 100, 0x4a4a5a);
-        this.physics.add.existing(this.platform, true); // true = static body
-        this.physics.add.existing(this.otherPlatform, true);
-        this.physics.add.existing(this.anotherPlatform, true);
-
+        this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+        this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+        
         // Collision physics
-        this.physics.add.collider(this.player.sprite, this.platform);
-        this.physics.add.collider(this.enemy.sprite, this.platform);
-        this.physics.add.collider(this.player.sprite, this.otherPlatform);
-        this.physics.add.collider(this.enemy.sprite, this.otherPlatform);
-        this.physics.add.collider(this.player.sprite, this.anotherPlatform);
-        this.physics.add.collider(this.enemy.sprite, this.anotherPlatform);
+        this.addPlatformColliders(this.player.sprite);
 
         // Initialize the movement keys
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -99,6 +98,7 @@ class GameScene extends Phaser.Scene {
         this.xKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
 
         // Basic Attack
+        this.isAttacking = false;
         this.attackRequested = false
         this.attackCooldown = 0;
         this.attackCooldownDuration = 500; // ms
@@ -113,7 +113,7 @@ class GameScene extends Phaser.Scene {
         // For seeing rooms - TAKE OUT WHEN GOING LIVE: TODO
         if(Phaser.Input.Keyboard.JustDown(this.zoomKey)) {
             this.debugZoomedOut = !this.debugZoomedOut;
-            this.cameras.main.setZoom(this.debugZoomedOut ? 0.2 : 1);
+            this.cameras.main.setZoom(this.debugZoomedOut ? 0.3 : 1);
         }
 
         // Player Health Bar
@@ -127,7 +127,7 @@ class GameScene extends Phaser.Scene {
 
         if(this.player.alive) {
             const grounded = this.player.sprite.body.blocked.down;
-            const airControl = 0.10;
+            const airControl = 0.05;
 
             if(grounded) {
                 this.player.sprite.body.setVelocityX(0);
@@ -203,23 +203,35 @@ class GameScene extends Phaser.Scene {
         this.enemy.tryAttack(this.player, this.game.loop.delta);
     }
 
+    // ------------------ ENEMY FUNCTIONS ------------------ //
     spawnEnemy(x, y, config) {
         const enemy = new Enemy(this, x, y, config);
         this.enemies.push(enemy);
+        this.addPlatformColliders(enemy.sprite);
         return enemy;
     }
 
+    respawnEnemy() {
+        this.time.delayedCall(2000, () => {
+            this.enemy = this.spawnEnemy(100, 300, {
+                name: 'Enemeanie',
+                hp: 100,
+                maxHp: 100,
+            });
+            this.enemy.sprite.body.setSize(32, 32);
+        });
+    }
+
+    removeEnemyFromArray(enemyToRemove) {
+        this.enemies = this.enemies.filter(enemy => enemy !== enemyToRemove);
+    }
+    // ------------------- END ENEMY FUNCTIONS ---------------- //
     showUpgradeChoice() {
         const { width, height } = this.cameras.main;
         const cardWidth = 180;
         const cardHeight = 220;
         const gap = 40;
         const centerY = height / 2;
-
-        const cardData = [
-            { title: '+30 DAMAGE', desc: 'Adds +30 damage per hit' },
-            { title: 'TICKING DAMAGE', desc: '5 damage per second until the enemy dies' },
-        ];
 
         const xPositions = [
             width / 2 - cardWidth / 2 - gap / 2,
@@ -274,6 +286,14 @@ class GameScene extends Phaser.Scene {
         });
 
         this.upgradeCards = [];
+    }
+
+    addPlatformColliders(sprite) {
+        this.physics.add.collider(sprite, this.groundLayer);
+        
+        // this.platforms.forEach(platform => {
+        //     this.physics.add.collider(sprite, platform);
+        // });
     }
 
 }
