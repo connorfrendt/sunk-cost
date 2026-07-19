@@ -89,7 +89,5 @@ export default class Enemy {
         this.hpBarBg.y = this.sprite.y - 28;
         this.hpBar.x = this.sprite.x - 20;
         this.hpBar.y = this.sprite.y - 28;
-        // this.nameText.x = this.sprite.x - this.nameText.width / 2;
-        // this.nameText.y = this.sprite.y - 40;
     }
 }

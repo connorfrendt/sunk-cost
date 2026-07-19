@@ -29,18 +29,21 @@ class GameScene extends Phaser.Scene {
 
     create() {
         const map = this.make.tilemap({ key: 'tilemap' });
-        const tilesetBig = map.addTilesetImage('tile', 'tile');
         const tilesetSmall = map.addTilesetImage('tile-small', 'tile-small');
 
-        this.groundLayer = map.createLayer('Tile Layer 1', [tilesetBig, tilesetSmall], 0, 0);
+        this.groundLayer = map.createLayer('Tile Layer 1', tilesetSmall, 0, 0);
         this.groundLayer.setCollisionByProperty({ collides: true });
+
+        const spawnLayer = map.getObjectLayer('Spawns');
+
+        const playerSpawn = spawnLayer.objects.find(obj => obj.name === 'player-spawn');
+        this.player = new Player(this, playerSpawn.x, playerSpawn.y);
 
         this.input.mouse.disableContextMenu();
 
         this.zoomKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
         this.debugZoomedOut = false;
 
-        this.player = new Player(this, 320, 180);
         this.physics.add.collider(this.player.sprite, this.groundLayer);
 
         // Animation Creation
@@ -71,15 +74,22 @@ class GameScene extends Phaser.Scene {
 
         // Spawn First Enemy
         this.enemies = [];
-        this.enemy = this.spawnEnemy(100, 300, {
-            name: 'Enemeanie',
-            hp: 50,
-            maxHp: 50,
+        const enemySpawnPoints = spawnLayer.objects.filter(obj => obj.name === 'enemy-spawn');
+        enemySpawnPoints.forEach(point => {
+            this.spawnEnemy(point.x, point.y, {
+                name: 'Enemeanie',
+                hp: 50,
+                maxHp: 50,
+            });
         });
+
+        this.bossMinionSpawnPoints = spawnLayer.objects.filter(obj => obj.name === 'boss-minion-spawn');
+        this.bossSpawnPoint = spawnLayer.objects.find(obj => obj.name === 'boss-enemy-spawn');
 
         // Add physics to player/enemy
         this.physics.add.existing(this.player.sprite);
-        this.physics.add.existing(this.enemy.sprite);
+
+        this.enemies.forEach(enemy => this.physics.add.existing(enemy.sprite));
         this.player.sprite.body.setSize(25, 32);
         this.player.sprite.body.setCollideWorldBounds(true);
         
@@ -98,14 +108,13 @@ class GameScene extends Phaser.Scene {
         this.xKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
 
         // Basic Attack
-        this.isAttacking = false;
-        this.attackRequested = false
-        this.attackCooldown = 0;
-        this.attackCooldownDuration = 500; // ms
-        
+        // this.player.isAttacking;
+        // this.player.attackRequested;
+        // this.player.attackCooldown;
+        // this.player.attackCooldownDuration;
 
         this.input.keyboard.on('keydown-X', () => {
-            this.attackRequested = true;
+            this.player.attackRequested = true;
         });
     }
 
@@ -123,7 +132,9 @@ class GameScene extends Phaser.Scene {
         this.player.hpBar.y = this.player.sprite.y - 28;
 
         // Enemy Health Bar/Visuals
-        this.enemy.syncVisuals();
+        this.enemies.forEach(enemy => {
+            if(enemy.alive) enemy.syncVisuals();
+        });
 
         if(this.player.alive) {
             const grounded = this.player.sprite.body.blocked.down;
@@ -134,7 +145,6 @@ class GameScene extends Phaser.Scene {
 
                 // Movement
                 if(this.cursors.left.isDown || this.wasd.A.isDown) {
-                    // this.player.sprite.play('ninja-idle-left', true);
                     this.player.lastDirectionFaced = 'left';
                     this.player.sprite.body.setVelocityX(-this.player.speed);
                     if(!this.isAttacking) {
@@ -142,7 +152,6 @@ class GameScene extends Phaser.Scene {
                     }
                 }
                 if(this.cursors.right.isDown || this.wasd.D.isDown) {
-                    // this.player.sprite.play('ninja-idle-right', true);
                     this.player.lastDirectionFaced = 'right';
                     this.player.sprite.body.setVelocityX(this.player.speed);
                     if(!this.isAttacking) {
@@ -156,9 +165,11 @@ class GameScene extends Phaser.Scene {
                 
                 if(this.cursors.left.isDown || this.wasd.A.isDown) {
                     targetVelocityX = -this.player.speed;
+                    // this.player.sprite.play('ninja-idle-left', true);
                 }
                 else if (this.cursors.right.isDown || this.wasd.D.isDown) {
                     targetVelocityX = this.player.speed;
+                    // this.player.sprite.play('ninja-idle-right', true);
                 }
 
                 const currentVelocityX = this.player.sprite.body.velocity.x;
@@ -172,35 +183,39 @@ class GameScene extends Phaser.Scene {
             }
 
             // Attack Cooldown Tick
-            if(this.attackCooldown > 0) {
-                this.attackCooldown -= this.game.loop.delta;
+            if(this.player.attackCooldown > 0) {
+                this.player.attackCooldown -= this.game.loop.delta;
             }
             
             // Attack
-            if(this.attackRequested && this.attackCooldown <= 0) {
-                this.isAttacking = true;
+            if(this.player.attackRequested && this.player.attackCooldown <= 0) {
+                this.player.isAttacking = true;
                 this.player.sprite.play(this.player.lastDirectionFaced === 'left' ? 'ninja-attack-left' : 'ninja-attack-right', true);
                 
                 const aliveEnemies = this.enemies.filter(enemy => enemy.alive);
-                const distance = Phaser.Math.Distance.Between(
-                    this.player.sprite.x, this.player.sprite.y,
-                    this.enemy.sprite.x, this.enemy.sprite.y
-                );
+                aliveEnemies.forEach(enemy => {
+                    const distance = Phaser.Math.Distance.Between(
+                        this.player.sprite.x, this.player.sprite.y,
+                        enemy.sprite.x, enemy.sprite.y,
+                    );
 
-                if(distance <= this.player.attackRange) {
-                    this.enemy.takeDamage(10, this.player.sprite);
-                }
+                    if(distance <= this.player.attackRange) {
+                        enemy.takeDamage(10, this.player.sprite);
+                    }
+                });
 
-                this.attackCooldown = this.attackCooldownDuration;
+                this.player.attackCooldown = this.player.attackCooldownDuration;
             }
 
-            this.attackRequested = false;
+            this.player.attackRequested = false;
 
 
         }
 
         // Enemy AI
-        this.enemy.tryAttack(this.player, this.game.loop.delta);
+        this.enemies.forEach(enemy => {
+            if(enemy.alive) enemy.tryAttack(this.player, this.game.loop.delta);
+        })
     }
 
     // ------------------ ENEMY FUNCTIONS ------------------ //
@@ -290,10 +305,6 @@ class GameScene extends Phaser.Scene {
 
     addPlatformColliders(sprite) {
         this.physics.add.collider(sprite, this.groundLayer);
-        
-        // this.platforms.forEach(platform => {
-        //     this.physics.add.collider(sprite, platform);
-        // });
     }
 
 }
@@ -313,7 +324,7 @@ const config = {
         default: 'arcade',
         arcade: {
             gravity: { y: 2000 },
-            debug: true,
+            debug: false,
         }
     },
     scene: GameScene,
