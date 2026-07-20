@@ -37,7 +37,19 @@ class GameScene extends Phaser.Scene {
         const spawnLayer = map.getObjectLayer('Spawns');
 
         const playerSpawn = spawnLayer.objects.find(obj => obj.name === 'player-spawn');
-        this.player = new Player(this, playerSpawn.x, playerSpawn.y);
+        const playerSpawnCentered = this.getObjectCenter(playerSpawn);
+        this.player = new Player(this, playerSpawnCentered.x, playerSpawnCentered.y);
+
+        // Boss Wall Trigger to seal boss room once inside
+        this.bossRoomWallTrigger = spawnLayer.objects.find(obj => obj.name === 'boss-wall-trigger');
+        
+        const triggerZoneCenter = this.getObjectCenter(this.bossRoomWallTrigger);
+        const triggerZone = this.add.rectangle(triggerZoneCenter.x, triggerZoneCenter.y, this.bossRoomWallTrigger.width, this.bossRoomWallTrigger.height, 0xff0000, 0);
+        
+        this.physics.add.existing(triggerZone, true);
+        this.physics.add.overlap(this.player.sprite, triggerZone, () => {
+            this.enterBossRoom()
+        });
 
         this.input.mouse.disableContextMenu();
 
@@ -62,11 +74,11 @@ class GameScene extends Phaser.Scene {
             if(this.player.alive) {
                 
                 if(animation.key === 'ninja-attack-left') {
-                    this.isAttacking = false;
+                    this.player.isAttacking = false;
                     this.player.sprite.play('ninja-idle-left', true);
                 }
                 if(animation.key === 'ninja-attack-right') {
-                    this.isAttacking = false;
+                    this.player.isAttacking = false;
                     this.player.sprite.play('ninja-idle-right', true);
                 }
             }
@@ -76,10 +88,10 @@ class GameScene extends Phaser.Scene {
         this.enemies = [];
         const enemySpawnPoints = spawnLayer.objects.filter(obj => obj.name === 'enemy-spawn');
         enemySpawnPoints.forEach(point => {
-            this.spawnEnemy(point.x, point.y, {
+            this.spawnEnemy(point.x + point.width / 2, point.y + point.height / 2, {
                 name: 'Enemeanie',
-                hp: 50,
-                maxHp: 50,
+                hp: 20,
+                maxHp: 20,
             });
         });
 
@@ -106,12 +118,6 @@ class GameScene extends Phaser.Scene {
         this.wasd = this.input.keyboard.addKeys('W,A,S,D');
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.xKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
-
-        // Basic Attack
-        // this.player.isAttacking;
-        // this.player.attackRequested;
-        // this.player.attackCooldown;
-        // this.player.attackCooldownDuration;
 
         this.input.keyboard.on('keydown-X', () => {
             this.player.attackRequested = true;
@@ -147,14 +153,14 @@ class GameScene extends Phaser.Scene {
                 if(this.cursors.left.isDown || this.wasd.A.isDown) {
                     this.player.lastDirectionFaced = 'left';
                     this.player.sprite.body.setVelocityX(-this.player.speed);
-                    if(!this.isAttacking) {
+                    if(!this.player.isAttacking) {
                         this.player.sprite.play('ninja-idle-left', true);
                     }
                 }
                 if(this.cursors.right.isDown || this.wasd.D.isDown) {
                     this.player.lastDirectionFaced = 'right';
                     this.player.sprite.body.setVelocityX(this.player.speed);
-                    if(!this.isAttacking) {
+                    if(!this.player.isAttacking) {
                         this.player.sprite.play('ninja-idle-right', true);
                     }
                 }
@@ -165,11 +171,9 @@ class GameScene extends Phaser.Scene {
                 
                 if(this.cursors.left.isDown || this.wasd.A.isDown) {
                     targetVelocityX = -this.player.speed;
-                    // this.player.sprite.play('ninja-idle-left', true);
                 }
                 else if (this.cursors.right.isDown || this.wasd.D.isDown) {
                     targetVelocityX = this.player.speed;
-                    // this.player.sprite.play('ninja-idle-right', true);
                 }
 
                 const currentVelocityX = this.player.sprite.body.velocity.x;
@@ -177,9 +181,16 @@ class GameScene extends Phaser.Scene {
                 this.player.sprite.body.setVelocityX(newVelocityX);
             }
 
+            // Jumping
+            const jumpKeyDown = this.spaceKey.isDown || this.cursors.up.isDown;
+            const jumpKeyJustPressed = Phaser.Input.Keyboard.JustDown(this.spaceKey) || Phaser.Input.Keyboard.JustDown(this.cursors.up);
 
-            if((Phaser.Input.Keyboard.JustDown(this.spaceKey) || this.cursors.up.isDown) && this.player.sprite.body.blocked.down) {
+            if(jumpKeyJustPressed && this.player.sprite.body.blocked.down) {
                 this.player.sprite.body.setVelocityY(-750);
+            }
+
+            if(!jumpKeyDown && this.player.sprite.body.velocity.y < 0) {
+                this.player.sprite.body.setVelocityY(this.player.sprite.body.velocity.y * 0.5);
             }
 
             // Attack Cooldown Tick
@@ -201,6 +212,8 @@ class GameScene extends Phaser.Scene {
 
                     if(distance <= this.player.attackRange) {
                         enemy.takeDamage(10, this.player.sprite);
+                        this.showHitEffect(enemy.sprite.x, enemy.sprite.y);
+                        this.flashHit(enemy.sprite);
                     }
                 });
 
@@ -214,8 +227,11 @@ class GameScene extends Phaser.Scene {
 
         // Enemy AI
         this.enemies.forEach(enemy => {
-            if(enemy.alive) enemy.tryAttack(this.player, this.game.loop.delta);
-        })
+            if(enemy.alive) {
+                enemy.moveTowardPlayer(this.player);
+                enemy.tryAttack(this.player, this.game.loop.delta);
+            }
+        });
     }
 
     // ------------------ ENEMY FUNCTIONS ------------------ //
@@ -226,21 +242,15 @@ class GameScene extends Phaser.Scene {
         return enemy;
     }
 
-    respawnEnemy() {
-        this.time.delayedCall(2000, () => {
-            this.enemy = this.spawnEnemy(100, 300, {
-                name: 'Enemeanie',
-                hp: 100,
-                maxHp: 100,
-            });
-            this.enemy.sprite.body.setSize(32, 32);
-        });
-    }
-
     removeEnemyFromArray(enemyToRemove) {
         this.enemies = this.enemies.filter(enemy => enemy !== enemyToRemove);
+
+        if(this.bossRoomEntered && this.bossRoomEnemies) {
+            this.bossRoomEnemies = this.bossRoomEnemies.filter(enemy => enemy !== enemyToRemove);
+        }
     }
-    // ------------------- END ENEMY FUNCTIONS ---------------- //
+    
+    // ------------------- UPGRADE CHOICES ---------------- //
     showUpgradeChoice() {
         const { width, height } = this.cameras.main;
         const cardWidth = 180;
@@ -262,9 +272,10 @@ class GameScene extends Phaser.Scene {
             
             const title = this.add.text(x, centerY - 60, cardData[i].title, {
                 fontFamily: 'monospace',
-                fontSize: '16px',
+                fontSize: '20px',
                 color: '#fbbf24',
                 align: 'center',
+                resolution: 3,
                 wordWrap: {
                     width: cardWidth - 20,
                 }
@@ -275,9 +286,10 @@ class GameScene extends Phaser.Scene {
             
             const desc = this.add.text(x, centerY + 10, cardData[i].desc, {
                 fontFamily: 'monospace',
-                fontSize: '12px',
+                fontSize: '16px',
                 color: '#ffffff',
                 align: 'center',
+                resolution: 3,
                 wordWrap: {
                     width: cardWidth - 20,
                 }
@@ -303,10 +315,101 @@ class GameScene extends Phaser.Scene {
         this.upgradeCards = [];
     }
 
+    // --------- PLATFORMS --------- //
     addPlatformColliders(sprite) {
         this.physics.add.collider(sprite, this.groundLayer);
     }
 
+    // ---------- Visual Effects ----------- //
+    showHitEffect(x, y) {
+        const spark = this.add.circle(x, y, 6, 0xffffff, 0.9);
+        this.tweens.add({
+            targets: spark,
+            scale: 2.5,
+            alpha: 0,
+            duration: 150,
+            onComplete: () => spark.destroy(),
+        });
+    }
+
+    flashHit(sprite) {
+        if(!sprite || !sprite.active) return;
+        sprite.setTint(0xff0000);
+        this.time.delayedCall(100, () => {
+            if(sprite.active) {
+                sprite.clearTint();
+            }
+        });
+    }
+
+    // -------- BOSS ROOM STUFF ---------- //
+    enterBossRoom() {
+        if(this.bossRoomEntered) return;
+        this.bossRoomEntered = true;
+
+        this.cameras.main.stopFollow();
+        this.cameras.main.setZoom(0.75);
+        this.cameras.main.centerOn(this.bossRoomWallTrigger.x, this.bossRoomWallTrigger.y); // tune to actual arena
+
+        this.bossRoomEnemies = [];
+        this.bossMinionSpawnPoints.forEach(point => {
+            const enemy = this.spawnEnemy(
+                point.x,
+                point.y,
+                {
+                    name: 'Minion',
+                    hp: 30,
+                    maxHp: 30
+                }
+            );
+            this.bossRoomEnemies.push(enemy);
+        });
+
+        const boss = this.spawnEnemy(
+            this.bossSpawnPoint.x,
+            this.bossSpawnPoint.y,
+            { 
+                name: 'Boss',
+                hp: 50,
+                maxHp: 50,
+                isBoss: true,
+            }
+        );
+        console.log('BOSS: ', boss);
+        this.bossRoomEnemies.push(boss);
+        console.log('BOSS ROOM ENEMIES: ', this.bossRoomEnemies);
+
+        this.sealBossRoom();
+    }
+
+    sealBossRoom() {
+        const bossRoomWallCentered = this.getObjectCenter(this.bossRoomWallTrigger);
+        const tileSize = 16;
+        const tileCount = 5;
+        
+        const bossRoomWallTiles = [];
+
+        for(let i = 0; i <= tileCount; i++) {
+            const tile = this.add.tileSprite(
+                bossRoomWallCentered.x - 56,
+                this.bossRoomWallTrigger.y + (i * tileSize),
+                tileSize,
+                tileSize,
+                'tile-small',
+            );
+            
+            this.physics.add.existing(tile, true);
+            this.physics.add.collider(this.player.sprite, tile);
+            bossRoomWallTiles.push(tile);
+        }
+    }
+
+    getObjectCenter(obj) {
+        return {
+            x: obj.x + obj.width / 2,
+            y: obj.y + obj.height / 2,
+        };
+    }
 }
 
 const config = {

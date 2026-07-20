@@ -2,6 +2,11 @@ export default class Enemy {
     constructor(scene, x, y, config) {
         this.scene = scene;
 
+        // Properties
+        this.name = config.name || '';
+        this.isBoss = config.isBoss || false;
+
+        // Attacking
         this.attackCooldown = 0;
         this.attackInterval = 3000; // ms between attacks (3s)
         this.attackDamage = config.attackDamage || 10;
@@ -22,6 +27,43 @@ export default class Enemy {
 
         // Stats
         this.alive = true;
+    }
+
+    moveTowardPlayer(player) {
+        if(!this.alive) return;
+
+        const distance = Phaser.Math.Distance.Between(
+            this.sprite.x, this.sprite.y,
+            player.sprite.x, player.sprite.y
+        );
+
+        const chaseRange = 300; // How far away enemy notices the player
+        const stopRange = 60; // Don't walk into center of player, stand at melee range
+        const speed = 40; // Pixels per second
+        const jumpVelocity = -750;
+
+        if(distance < chaseRange && distance > stopRange) {
+            const angle = Phaser.Math.Angle.Between(
+                this.sprite.x, this.sprite.y,
+                player.sprite.x, player.sprite.y
+            );
+            const desiredVelocityX = Math.cos(angle) * speed;
+            this.sprite.body.setVelocityX(desiredVelocityX);
+            this.sprite.play('enemy-idle-left', true);
+
+            const facingKey = player.sprite.x < this.sprite.x ? 'enemy-idle-left' : 'enemy-idle-right';
+            this.sprite.play(facingKey, true);
+
+            const movingRight = desiredVelocityX > 0;
+            const movingLeft = desiredVelocityX < 0;
+            const blockedInMoveDirection =
+                (movingRight && this.sprite.body.blocked.right) ||
+                (movingLeft && this.sprite.body.blocked.left);
+
+            if(blockedInMoveDirection && this.sprite.body.blocked.down) {
+                this.sprite.body.setVelocityY(jumpVelocity);
+            }
+        }
     }
 
     tryAttack(player, delta) {
@@ -67,21 +109,23 @@ export default class Enemy {
     }
 
     die() {
+        console.log(this);
         this.alive = false;
         this.sprite.stop();
         this.destroy();
         this.hpBar.setVisible(false);
         this.hpBarBg.setVisible(false);
-        this.scene.showUpgradeChoice();
         this.scene.removeEnemyFromArray(this);
-        this.scene.respawnEnemy();
+        
+        if(this.isBoss) {
+            this.scene.showUpgradeChoice();
+        }
     }
 
     destroy() {
         this.sprite.destroy();
         this.hpBar.destroy();
         this.hpBarBg.destroy();
-        // this.nameText.destroy();
     }
 
     syncVisuals() {

@@ -223,6 +223,18 @@
                  "width":32,
                  "x":245.333333333333,
                  "y":604.666666666667
+                }, 
+                {
+                 "height":72.3333333333334,
+                 "id":13,
+                 "name":"boss-wall-trigger",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":6.33333333333337,
+                 "x":860.333333333333,
+                 "y":227.333333333333
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -231,7 +243,7 @@
          "y":0
         }],
  "nextlayerid":3,
- "nextobjectid":13,
+ "nextobjectid":14,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",
@@ -240,7 +252,7 @@
         {
          "columns":1,
          "firstgid":1,
-         "image":"tile-small.png",
+         "image":"..\/..\/..\/..\/..\/Users\/cjack\/Downloads\/tile-small.png",
          "imageheight":16,
          "imagewidth":16,
          "margin":0,
