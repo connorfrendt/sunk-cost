@@ -125,6 +125,8 @@ class GameScene extends Phaser.Scene {
     }
 
     update() {
+        if(this.gamePaused) return;
+
         // For seeing rooms - TAKE OUT WHEN GOING LIVE: TODO
         if(Phaser.Input.Keyboard.JustDown(this.zoomKey)) {
             this.debugZoomedOut = !this.debugZoomedOut;
@@ -252,7 +254,32 @@ class GameScene extends Phaser.Scene {
     
     // ------------------- UPGRADE CHOICES ---------------- //
     showUpgradeChoice() {
+        this.gamePaused = true;
+        this.physics.pause();
+
         const { width, height } = this.cameras.main;
+
+        // Dark Overlay
+        const zoom = this.cameras.main.zoom;
+        this.upgradeOverlay = this.add.rectangle(width / 2, height /2, width / zoom, height / zoom, 0x000000, 0.7)
+            .setScrollFactor(0)
+            .setDepth(90);
+
+        // Header Text
+        this.upgradeHeader = this.add.text(width / 2, 50,
+            'Everything has a price.  Whichever power you choose, \nthe other will go to all future bosses.  Choose wisely...', {
+                fontFamily: 'monospace',
+                fontSize: '16px',
+                color: '#ffffff',
+                align: 'center',
+                resolution: 3,
+                wordWrap: { width: width - 60 },
+            }
+        )
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(101);
+
         const cardWidth = 180;
         const cardHeight = 220;
         const gap = 40;
@@ -313,6 +340,12 @@ class GameScene extends Phaser.Scene {
         });
 
         this.upgradeCards = [];
+
+        this.upgradeOverlay.destroy();
+        this.upgradeHeader.destroy();
+
+        this.physics.resume();
+        this.gamePaused = false;
     }
 
     // --------- PLATFORMS --------- //
@@ -349,7 +382,7 @@ class GameScene extends Phaser.Scene {
 
         this.cameras.main.stopFollow();
         this.cameras.main.setZoom(0.75);
-        this.cameras.main.centerOn(this.bossRoomWallTrigger.x, this.bossRoomWallTrigger.y); // tune to actual arena
+        this.cameras.main.centerOn(1144, 166); // tune to actual arena
 
         this.bossRoomEnemies = [];
         this.bossMinionSpawnPoints.forEach(point => {
@@ -404,6 +437,7 @@ class GameScene extends Phaser.Scene {
         }
     }
 
+    // ------- HELPERS -------- //
     getObjectCenter(obj) {
         return {
             x: obj.x + obj.width / 2,
