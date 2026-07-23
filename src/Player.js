@@ -25,7 +25,7 @@ export default class Player {
         this.isAttacking = false;
         this.attackRequested = false
         this.attackCooldown = 0;
-        this.attackCooldownDuration = 500; // ms
+        this.attackCooldownDuration = 250; // ms
     }
 
     takeDamage(amount) {

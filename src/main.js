@@ -3,7 +3,7 @@ import Player from './Player.js';
 import Enemy from './Enemy.js';
 import { cardData } from './upgrades.js'
 
-class GameScene extends Phaser.Scene {
+class Room1Scene extends Phaser.Scene {
     constructor() {
         super({ key: 'GameScene' });
     }
@@ -22,42 +22,15 @@ class GameScene extends Phaser.Scene {
             frameWidth: 96,
             frameHeight: 96,
         });
-        this.load.image('tile', '/assets/tilemaps/tile.png');
-        this.load.image('tile-small', '/assets/tilemaps/tile-small.png');
-        this.load.tilemapTiledJSON('tilemap', '/assets/tilemaps/tilemap.json');
+        this.load.spritesheet('brazier', '/assets/tilemaps/brazier.png', {
+            frameWidth: 16,
+            frameHeight: 16,
+        });
+        this.load.image('purple-tileset', '/assets/tilemaps/purple-tileset.png');
+        this.load.tilemapTiledJSON('purple-map', '/assets/tilemaps/purple-map.json');
     }
 
     create() {
-        const map = this.make.tilemap({ key: 'tilemap' });
-        const tilesetSmall = map.addTilesetImage('tile-small', 'tile-small');
-
-        this.groundLayer = map.createLayer('Tile Layer 1', tilesetSmall, 0, 0);
-        this.groundLayer.setCollisionByProperty({ collides: true });
-
-        const spawnLayer = map.getObjectLayer('Spawns');
-
-        const playerSpawn = spawnLayer.objects.find(obj => obj.name === 'player-spawn');
-        const playerSpawnCentered = this.getObjectCenter(playerSpawn);
-        this.player = new Player(this, playerSpawnCentered.x, playerSpawnCentered.y);
-
-        // Boss Wall Trigger to seal boss room once inside
-        this.bossRoomWallTrigger = spawnLayer.objects.find(obj => obj.name === 'boss-wall-trigger');
-        
-        const triggerZoneCenter = this.getObjectCenter(this.bossRoomWallTrigger);
-        const triggerZone = this.add.rectangle(triggerZoneCenter.x, triggerZoneCenter.y, this.bossRoomWallTrigger.width, this.bossRoomWallTrigger.height, 0xff0000, 0);
-        
-        this.physics.add.existing(triggerZone, true);
-        this.physics.add.overlap(this.player.sprite, triggerZone, () => {
-            this.enterBossRoom()
-        });
-
-        this.input.mouse.disableContextMenu();
-
-        this.zoomKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
-        this.debugZoomedOut = false;
-
-        this.physics.add.collider(this.player.sprite, this.groundLayer);
-
         // Animation Creation
         this.anims.create({ key: 'ninja-idle-left', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 8, end: 15 }), frameRate: 4, repeat: -1 });
         this.anims.create({ key: 'ninja-idle-right', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 0, end: 7 }), frameRate: 4, repeat: -1 });
@@ -67,6 +40,70 @@ class GameScene extends Phaser.Scene {
 
         this.anims.create({ key: 'ninja-attack-left', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 0, end: 2 }), frameRate: 12, repeat: 0 });
         this.anims.create({ key: 'ninja-attack-right', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 3, end: 5 }), frameRate: 12, repeat: 0 });
+
+        this.anims.create({ key: 'brazier', frames: this.anims.generateFrameNumbers('brazier', { start: 0, end: 11 }), frameRate: 6, repeat: -1 });
+
+        // Create Map
+        const map = this.make.tilemap({ key: 'purple-map' });
+        const purpleTileSet = map.addTilesetImage('purple-tileset', 'purple-tileset');
+        this.groundLayer = map.createLayer('Tile Layer 1', purpleTileSet, 0, 0);
+        this.groundLayer.setCollisionByProperty({ collides: true });
+
+        // Grabs all the object spawns in from Tiled
+        this.spawnLayer = map.getObjectLayer('Spawn Layer');
+
+        // Spawns Player
+        const playerSpawn = this.spawnLayer.objects.find(obj => obj.name === 'player-spawn');
+        const playerSpawnCentered = this.getObjectCenter(playerSpawn);
+        this.player = new Player(this, playerSpawnCentered.x, playerSpawnCentered.y);
+
+        // Spawn Braziers
+        const brazierPoints = this.spawnLayer.objects.filter(obj => obj.name === 'brazier');
+        brazierPoints.forEach(point => {
+            const brazierCenter = this.getObjectCenter(point);
+            const brazier = this.add.sprite(brazierCenter.x, brazierCenter.y, 'brazier');
+            brazier.play('brazier');
+        });
+
+        // Spawn First Enemy
+        this.enemies = [];
+        const enemySpawnPoints = this.spawnLayer.objects.filter(obj => obj.name === 'enemy-spawn');
+        enemySpawnPoints.forEach(point => {
+            this.spawnEnemy(point.x + point.width / 2, point.y + point.height / 2, {
+                name: 'Enemeanie',
+                hp: 20,
+                maxHp: 20,
+            });
+        });
+
+        // Door Light
+        const particleGraphics = this.make.graphics();
+        particleGraphics.fillStyle(0xfff4c2, 1);
+        particleGraphics.fillCircle(4, 4, 4) // small 8x8 soft dot
+        particleGraphics.generateTexture('light-particle', 8, 8);
+        particleGraphics.destroy();
+
+
+
+        // Boss Wall Trigger to seal boss room once inside
+        // this.bossRoomWallTrigger = this.spawnLayer.objects.find(obj => obj.name === 'boss-wall-trigger');
+        
+        // const triggerZoneCenter = this.getObjectCenter(this.bossRoomWallTrigger);
+        // const triggerZone = this.add.rectangle(triggerZoneCenter.x, triggerZoneCenter.y, this.bossRoomWallTrigger.width, this.bossRoomWallTrigger.height, 0xff0000, 0);
+        
+        // this.physics.add.existing(triggerZone, true);
+        // this.physics.add.overlap(this.player.sprite, triggerZone, () => {
+        //     this.enterBossRoom()
+        // });
+
+        this.input.mouse.disableContextMenu();
+
+        this.zoomKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
+        this.debugZoomedOut = false;
+
+        this.physics.add.collider(this.player.sprite, this.groundLayer);
+
+        
 
         this.player.sprite.play('ninja-idle-right');
         
@@ -84,19 +121,10 @@ class GameScene extends Phaser.Scene {
             }
         });
 
-        // Spawn First Enemy
-        this.enemies = [];
-        const enemySpawnPoints = spawnLayer.objects.filter(obj => obj.name === 'enemy-spawn');
-        enemySpawnPoints.forEach(point => {
-            this.spawnEnemy(point.x + point.width / 2, point.y + point.height / 2, {
-                name: 'Enemeanie',
-                hp: 20,
-                maxHp: 20,
-            });
-        });
+        
 
-        this.bossMinionSpawnPoints = spawnLayer.objects.filter(obj => obj.name === 'boss-minion-spawn');
-        this.bossSpawnPoint = spawnLayer.objects.find(obj => obj.name === 'boss-enemy-spawn');
+        this.bossMinionSpawnPoints = this.spawnLayer.objects.filter(obj => obj.name === 'boss-minion-spawn');
+        this.bossSpawnPoint = this.spawnLayer.objects.find(obj => obj.name === 'boss-enemy-spawn');
 
         // Add physics to player/enemy
         this.physics.add.existing(this.player.sprite);
@@ -346,6 +374,11 @@ class GameScene extends Phaser.Scene {
 
         this.physics.resume();
         this.gamePaused = false;
+
+        // Open the path forward and signal it visually
+        const doorLightPoint = this.spawnLayer.objects.find(obj => obj.name === 'door-light');
+        const doorLightCenter = this.getObjectCenter(doorLightPoint);
+        this.spawnDoorLight(doorLightCenter.x, doorLightCenter.y);
     }
 
     // --------- PLATFORMS --------- //
@@ -375,14 +408,44 @@ class GameScene extends Phaser.Scene {
         });
     }
 
+    spawnDoorLight(x, y) {
+        const emitter = this.add.particles(x, y, 'light-particle', {
+            speed: { min: 5, max: 20 },
+            scale: { start: 0.6, end: 0 },
+            alpha: { start: 0.7, end: 0 },
+            lifespan: 1200,
+            frequency: 150,
+            blendMode: 'ADD',
+        });
+
+        emitter.setAlpha(0);
+        this.tweens.add({
+            targets: emitter,
+            alpha: 1,
+            duration: 800,
+            ease: 'Sine.easeIn',
+        });
+
+        return emitter;
+    }
+
     // -------- BOSS ROOM STUFF ---------- //
     enterBossRoom() {
         if(this.bossRoomEntered) return;
         this.bossRoomEntered = true;
 
         this.cameras.main.stopFollow();
-        this.cameras.main.setZoom(0.75);
-        this.cameras.main.centerOn(1144, 166); // tune to actual arena
+
+        const arenaCenterX = 1144;
+        const arenaCenterY = 166;
+
+        this.cameras.main.pan(arenaCenterX, arenaCenterY, 600, 'Sine.easeInOut');
+        // this.cameras.main.pan(arenaCenterX, arenaCenterY, 600, 'Sine.easeInOut', false, (camera, progress) => {
+        //     if(progress === 1) {
+        //         // spawn enemies, seal wall - runs once pan finishes
+        //     }
+        // });
+        this.cameras.main.zoomTo(0.75, 600, 'Sine.easeInOut');
 
         this.bossRoomEnemies = [];
         this.bossMinionSpawnPoints.forEach(point => {
@@ -450,8 +513,9 @@ const config = {
     type: Phaser.AUTO,
     parent: 'game-container',
     width: 640,
-    height: 360,
+    height: 352,
     pixelArt: true,
+    roundPixels: true,
     backgroundColor: '#1a1a2e',
     scale: {
         mode: Phaser.Scale.FIT,
@@ -464,7 +528,8 @@ const config = {
             debug: false,
         }
     },
-    scene: GameScene,
+    scene: Room1Scene,
 }
 
 const game = new Phaser.Game(config);
+window.game = game;
