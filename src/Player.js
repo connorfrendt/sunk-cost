@@ -17,9 +17,22 @@ export default class Player {
         this.sprite.lastDirectionFaced = null;
 
         // HP Bar
-        this.hpBarBg = scene.add.rectangle(x, y - 28, 40, 6, 0x440000);
-        this.hpBar = scene.add.rectangle(x - 20, y - 28, 40, 6, 0x00ff00);
-        this.hpBar.setOrigin(0, 0.5);
+        this.hpBarBg = scene.add.rectangle(20, 20, 100, 30, 0x440000)
+            .setOrigin(0, 0.5)
+            .setScrollFactor(0)
+            .setDepth(100);
+        this.hpBar = scene.add.rectangle(20, 20, 100, 30, 0x00ff00)
+            .setOrigin(0, 0.5)
+            .setScrollFactor(0)
+            .setDepth(100);
+        this.hpText = scene.add.text(20, 30, `${this.hp} / ${this.maxHp}`, {
+            fontFamily: 'arial',
+            fontSize: '12px',
+            color: '#ffffff',
+            resolution: 3,
+        })
+            .setScrollFactor(0)
+            .setDepth(100);
 
         // Attacking
         this.isAttacking = false;
@@ -49,5 +62,6 @@ export default class Player {
     updateHpBar() {
         const pct = this.hp / this.maxHp;
         this.hpBar.scaleX = pct;
+        this.hpText.setText(`${this.hp} / ${this.maxHp}`);
     }
 }

@@ -5,6 +5,12 @@ export default class Enemy {
         // Properties
         this.name = config.name || '';
         this.isBoss = config.isBoss || false;
+        this.isAggro = false;
+        this.patrolDirection = 1; // 1 right, -1 left
+        this.patrolSpeed = 50;
+        this.patrolOriginX = x;
+        this.patrolRange = config.patrolRange || 80;
+        this.chaseDirection = 1; // persist across frames, only updates when there's a clear direction
 
         // Attacking
         this.attackCooldown = 0;
@@ -37,33 +43,58 @@ export default class Enemy {
             player.sprite.x, player.sprite.y
         );
 
-        const chaseRange = 300; // How far away enemy notices the player
+        const chaseRange = 600; // How far away enemy notices the player
         const stopRange = 60; // Don't walk into center of player, stand at melee range
-        const speed = 40; // Pixels per second
+        const speed = 80; // Pixels per second
         const jumpVelocity = -750;
+        const horizontalDeadzone = 10;
 
         if(distance < chaseRange && distance > stopRange) {
-            const angle = Phaser.Math.Angle.Between(
-                this.sprite.x, this.sprite.y,
-                player.sprite.x, player.sprite.y
-            );
-            const desiredVelocityX = Math.cos(angle) * speed;
-            this.sprite.body.setVelocityX(desiredVelocityX);
-            this.sprite.play('enemy-idle-left', true);
+            const xDifference = player.sprite.x - this.sprite.x;
 
-            const facingKey = player.sprite.x < this.sprite.x ? 'enemy-idle-left' : 'enemy-idle-right';
+            if(Math.abs(xDifference) > horizontalDeadzone) {
+                this.chaseDirection = xDifference > 0 ? 1 : -1;
+            }
+            
+            const movingRight = this.chaseDirection > 0;
+            this.sprite.body.setVelocityX(speed * this.chaseDirection);
+
+            const facingKey = movingRight ? 'enemy-idle-right' : 'enemy-idle-left';
             this.sprite.play(facingKey, true);
 
-            const movingRight = desiredVelocityX > 0;
-            const movingLeft = desiredVelocityX < 0;
             const blockedInMoveDirection =
                 (movingRight && this.sprite.body.blocked.right) ||
-                (movingLeft && this.sprite.body.blocked.left);
+                (!movingRight && this.sprite.body.blocked.left);
 
-            if(blockedInMoveDirection && this.sprite.body.blocked.down) {
+            // Jumping mechanism
+            if(blockedInMoveDirection && this.sprite.body.blocked.down && this.isBoss) {
                 this.sprite.body.setVelocityY(jumpVelocity);
             }
+            
+
         }
+        else {
+            this.sprite.body.setVelocityX(0);
+        }
+    }
+
+    patrol() {
+        if(!this.alive || this.isAggro) {
+            return;
+        }
+
+        this.sprite.body.setVelocityX(this.patrolSpeed * this.patrolDirection);
+        const distanceFromOrigin = this.sprite.x - this.patrolOriginX;
+
+        if(this.patrolDirection > 0 && distanceFromOrigin >= this.patrolRange) {
+            this.patrolDirection = -1;
+        }
+        else if (this.patrolDirection < 0 && distanceFromOrigin <= -this.patrolRange) {
+            this.patrolDirection = 1;
+        }
+
+        const facingKey = this.patrolDirection < 0 ? 'enemy-idle-left' : 'enemy-idle-right';
+        this.sprite.play(facingKey, true);
     }
 
     tryAttack(player, delta) {
@@ -93,6 +124,7 @@ export default class Enemy {
         if(!this.alive) {
             return;
         }
+        this.isAggro = true;
 
         this.hp -= amount;
         this.updateHpBar();

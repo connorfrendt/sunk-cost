@@ -26,7 +26,10 @@ class Room1Scene extends Phaser.Scene {
             frameWidth: 16,
             frameHeight: 16,
         });
-        this.load.image('purple-tileset', '/assets/tilemaps/purple-tileset.png');
+        this.load.spritesheet('purple-tileset', '/assets/tilemaps/purple-tileset.png', {
+            frameWidth: 16,
+            frameHeight: 16,
+        });
         this.load.tilemapTiledJSON('purple-map', '/assets/tilemaps/purple-map.json');
     }
 
@@ -83,18 +86,20 @@ class Room1Scene extends Phaser.Scene {
         particleGraphics.generateTexture('light-particle', 8, 8);
         particleGraphics.destroy();
 
-
-
         // Boss Wall Trigger to seal boss room once inside
-        // this.bossRoomWallTrigger = this.spawnLayer.objects.find(obj => obj.name === 'boss-wall-trigger');
+        this.bossRoomOneWallTrigger = this.spawnLayer.objects.find(obj => obj.name === 'boss-room-one-wall-trigger');
         
-        // const triggerZoneCenter = this.getObjectCenter(this.bossRoomWallTrigger);
-        // const triggerZone = this.add.rectangle(triggerZoneCenter.x, triggerZoneCenter.y, this.bossRoomWallTrigger.width, this.bossRoomWallTrigger.height, 0xff0000, 0);
+        const triggerZoneOneCenter = this.getObjectCenter(this.bossRoomOneWallTrigger);
+        const triggerZoneOne = this.add.rectangle(triggerZoneOneCenter.x, triggerZoneOneCenter.y, this.bossRoomOneWallTrigger.width, this.bossRoomOneWallTrigger.height, 0xff0000, 0);
         
-        // this.physics.add.existing(triggerZone, true);
-        // this.physics.add.overlap(this.player.sprite, triggerZone, () => {
-        //     this.enterBossRoom()
-        // });
+        this.physics.add.existing(triggerZoneOne, true);
+        this.physics.add.overlap(this.player.sprite, triggerZoneOne, () => {
+            this.enterBossRoom();
+        });
+
+        // Arena center
+        this.bossArenaOne = this.spawnLayer.objects.find(obj => obj.name === 'boss-arena-1');
+        this.bossArenaOneCenter = this.getObjectCenter(this.bossArenaOne);
 
         this.input.mouse.disableContextMenu();
 
@@ -123,7 +128,7 @@ class Room1Scene extends Phaser.Scene {
 
         
 
-        this.bossMinionSpawnPoints = this.spawnLayer.objects.filter(obj => obj.name === 'boss-minion-spawn');
+        // this.bossMinionSpawnPoints = this.spawnLayer.objects.filter(obj => obj.name === 'boss-minion-spawn');
         this.bossSpawnPoint = this.spawnLayer.objects.find(obj => obj.name === 'boss-enemy-spawn');
 
         // Add physics to player/enemy
@@ -160,12 +165,6 @@ class Room1Scene extends Phaser.Scene {
             this.debugZoomedOut = !this.debugZoomedOut;
             this.cameras.main.setZoom(this.debugZoomedOut ? 0.3 : 1);
         }
-
-        // Player Health Bar
-        this.player.hpBarBg.x = this.player.sprite.x;
-        this.player.hpBarBg.y = this.player.sprite.y - 28;
-        this.player.hpBar.x = this.player.sprite.x - 20;
-        this.player.hpBar.y = this.player.sprite.y - 28;
 
         // Enemy Health Bar/Visuals
         this.enemies.forEach(enemy => {
@@ -257,9 +256,14 @@ class Room1Scene extends Phaser.Scene {
 
         // Enemy AI
         this.enemies.forEach(enemy => {
-            if(enemy.alive) {
+            if(!enemy.alive) return;
+
+            if(enemy.isAggro || enemy.isBoss) {
                 enemy.moveTowardPlayer(this.player);
                 enemy.tryAttack(this.player, this.game.loop.delta);
+            }
+            else {
+                enemy.patrol();
             }
         });
     }
@@ -376,9 +380,9 @@ class Room1Scene extends Phaser.Scene {
         this.gamePaused = false;
 
         // Open the path forward and signal it visually
-        const doorLightPoint = this.spawnLayer.objects.find(obj => obj.name === 'door-light');
-        const doorLightCenter = this.getObjectCenter(doorLightPoint);
-        this.spawnDoorLight(doorLightCenter.x, doorLightCenter.y);
+        // const doorLightPoint = this.spawnLayer.objects.find(obj => obj.name === 'door-light');
+        // const doorLightCenter = this.getObjectCenter(doorLightPoint);
+        // this.spawnDoorLight(doorLightCenter.x, doorLightCenter.y);
     }
 
     // --------- PLATFORMS --------- //
@@ -430,36 +434,27 @@ class Room1Scene extends Phaser.Scene {
     }
 
     // -------- BOSS ROOM STUFF ---------- //
+    /*
+    BOSS ROOM NEEDS TO BE: 40 tiles wide x 22 tiles high
+    */
     enterBossRoom() {
         if(this.bossRoomEntered) return;
         this.bossRoomEntered = true;
 
         this.cameras.main.stopFollow();
+        
+        const arenaOneCenterX = this.bossArenaOneCenter.x;
+        const arenaOneCenterY = this.bossArenaOneCenter.y;
 
-        const arenaCenterX = 1144;
-        const arenaCenterY = 166;
-
-        this.cameras.main.pan(arenaCenterX, arenaCenterY, 600, 'Sine.easeInOut');
+        this.cameras.main.pan(arenaOneCenterX, arenaOneCenterY, 600, 'Sine.easeInOut');
         // this.cameras.main.pan(arenaCenterX, arenaCenterY, 600, 'Sine.easeInOut', false, (camera, progress) => {
         //     if(progress === 1) {
         //         // spawn enemies, seal wall - runs once pan finishes
         //     }
         // });
-        this.cameras.main.zoomTo(0.75, 600, 'Sine.easeInOut');
+        this.cameras.main.zoomTo(1, 600, 'Sine.easeInOut');
 
         this.bossRoomEnemies = [];
-        this.bossMinionSpawnPoints.forEach(point => {
-            const enemy = this.spawnEnemy(
-                point.x,
-                point.y,
-                {
-                    name: 'Minion',
-                    hp: 30,
-                    maxHp: 30
-                }
-            );
-            this.bossRoomEnemies.push(enemy);
-        });
 
         const boss = this.spawnEnemy(
             this.bossSpawnPoint.x,
@@ -471,32 +466,32 @@ class Room1Scene extends Phaser.Scene {
                 isBoss: true,
             }
         );
-        console.log('BOSS: ', boss);
+        
         this.bossRoomEnemies.push(boss);
-        console.log('BOSS ROOM ENEMIES: ', this.bossRoomEnemies);
 
         this.sealBossRoom();
     }
 
     sealBossRoom() {
-        const bossRoomWallCentered = this.getObjectCenter(this.bossRoomWallTrigger);
+        const bossRoomOneWallCentered = this.getObjectCenter(this.bossRoomOneWallTrigger);
         const tileSize = 16;
-        const tileCount = 5;
+        const tileCount = 4;
         
-        const bossRoomWallTiles = [];
+        const bossRoomOneWallTiles = [];
 
         for(let i = 0; i <= tileCount; i++) {
             const tile = this.add.tileSprite(
-                bossRoomWallCentered.x - 56,
-                this.bossRoomWallTrigger.y + (i * tileSize),
+                bossRoomOneWallCentered.x - 56,
+                this.bossRoomOneWallTrigger.y + (i * tileSize),
                 tileSize,
                 tileSize,
-                'tile-small',
+                'purple-tileset',
+                11
             );
             
             this.physics.add.existing(tile, true);
             this.physics.add.collider(this.player.sprite, tile);
-            bossRoomWallTiles.push(tile);
+            bossRoomOneWallTiles.push(tile);
         }
     }
 
