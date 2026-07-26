@@ -17,15 +17,15 @@ export default class Player {
         this.sprite.lastDirectionFaced = null;
 
         // HP Bar
-        this.hpBarBg = scene.add.rectangle(20, 20, 100, 30, 0x440000)
+        this.hpBarBg = scene.add.rectangle(20, 20, 150, 20, 0x440000)
             .setOrigin(0, 0.5)
             .setScrollFactor(0)
             .setDepth(100);
-        this.hpBar = scene.add.rectangle(20, 20, 100, 30, 0x00ff00)
+        this.hpBar = scene.add.rectangle(20, 20, 150, 20, 0x00ff00)
             .setOrigin(0, 0.5)
             .setScrollFactor(0)
             .setDepth(100);
-        this.hpText = scene.add.text(20, 30, `${this.hp} / ${this.maxHp}`, {
+        this.hpText = scene.add.text(70, 30, `${this.hp} / ${this.maxHp}`, {
             fontFamily: 'arial',
             fontSize: '12px',
             color: '#ffffff',
@@ -50,6 +50,7 @@ export default class Player {
         }
         
         this.hp -= amount;
+        this.scene.cameras.main.shake(150, 0.005);  
 
         if(this.hp <= 0) {
             this.hp = 0;

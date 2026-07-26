@@ -19,8 +19,12 @@ class Room1Scene extends Phaser.Scene {
             frameHeight: 144,
         });
         this.load.spritesheet('enemy-idle', '/assets/characters/enemeanie-idle.png', {
-            frameWidth: 96,
-            frameHeight: 96,
+            frameWidth: 144,
+            frameHeight: 144,
+        });
+        this.load.spritesheet('enemy-attack', '/assets/characters/enemeanie-attack.png', {
+            frameWidth: 144,
+            frameHeight: 144,
         });
         this.load.spritesheet('brazier', '/assets/tilemaps/brazier.png', {
             frameWidth: 16,
@@ -38,11 +42,34 @@ class Room1Scene extends Phaser.Scene {
         this.anims.create({ key: 'ninja-idle-left', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 8, end: 15 }), frameRate: 4, repeat: -1 });
         this.anims.create({ key: 'ninja-idle-right', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 0, end: 7 }), frameRate: 4, repeat: -1 });
         
+        this.anims.create({ key: 'ninja-attack-left', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 0, end: 2 }), frameRate: 12, repeat: 0 });
+        this.anims.create({ key: 'ninja-attack-right', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 3, end: 5 }), frameRate: 12, repeat: 0 });
+        
         this.anims.create({ key: 'enemy-idle-left', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 6, end: 11 }), frameRate: 3, repeat: -1 });
         this.anims.create({ key: 'enemy-idle-right', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 0, end: 5 }), frameRate: 3, repeat: -1 });
 
-        this.anims.create({ key: 'ninja-attack-left', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 0, end: 2 }), frameRate: 12, repeat: 0 });
-        this.anims.create({ key: 'ninja-attack-right', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 3, end: 5 }), frameRate: 12, repeat: 0 });
+        this.anims.create({
+            key: 'enemy-attack-right',
+            frames: [
+                { key: 'enemy-attack', frame: 0, duration: 50 },
+                { key: 'enemy-attack', frame: 1, duration: 50 },
+                { key: 'enemy-attack', frame: 2, duration: 500 },
+                { key: 'enemy-attack', frame: 3, duration: 50 },
+                { key: 'enemy-attack', frame: 4, duration: 50 },
+            ],
+            repeat: 0
+        });
+        this.anims.create({
+            key: 'enemy-attack-left',
+            frames: [
+                { key: 'enemy-attack', frame: 5, duration: 50 },
+                { key: 'enemy-attack', frame: 6, duration: 50 },
+                { key: 'enemy-attack', frame: 7, duration: 500 },
+                { key: 'enemy-attack', frame: 8, duration: 50 },
+                { key: 'enemy-attack', frame: 9, duration: 50 },
+            ],
+            repeat: 0
+        });
 
         this.anims.create({ key: 'brazier', frames: this.anims.generateFrameNumbers('brazier', { start: 0, end: 11 }), frameRate: 6, repeat: -1 });
 
@@ -60,6 +87,10 @@ class Room1Scene extends Phaser.Scene {
         const playerSpawnCentered = this.getObjectCenter(playerSpawn);
         this.player = new Player(this, playerSpawnCentered.x, playerSpawnCentered.y);
 
+        // Grab boss wall objects
+        this.bossRoomWallEntranceObj = this.spawnLayer.objects.find(obj => obj.name === 'boss-room-one-wall-entrance');
+        this.bossRoomWallExitObj = this.spawnLayer.objects.find(obj => obj.name === 'boss-room-one-wall-exit');
+
         // Spawn Braziers
         const brazierPoints = this.spawnLayer.objects.filter(obj => obj.name === 'brazier');
         brazierPoints.forEach(point => {
@@ -74,8 +105,8 @@ class Room1Scene extends Phaser.Scene {
         enemySpawnPoints.forEach(point => {
             this.spawnEnemy(point.x + point.width / 2, point.y + point.height / 2, {
                 name: 'Enemeanie',
-                hp: 20,
-                maxHp: 20,
+                hp: 30,
+                maxHp: 30,
             });
         });
 
@@ -108,8 +139,6 @@ class Room1Scene extends Phaser.Scene {
 
         this.physics.add.collider(this.player.sprite, this.groundLayer);
 
-        
-
         this.player.sprite.play('ninja-idle-right');
         
         this.player.sprite.on('animationcomplete', (animation) => {
@@ -126,9 +155,6 @@ class Room1Scene extends Phaser.Scene {
             }
         });
 
-        
-
-        // this.bossMinionSpawnPoints = this.spawnLayer.objects.filter(obj => obj.name === 'boss-minion-spawn');
         this.bossSpawnPoint = this.spawnLayer.objects.find(obj => obj.name === 'boss-enemy-spawn');
 
         // Add physics to player/enemy
@@ -281,6 +307,12 @@ class Room1Scene extends Phaser.Scene {
 
         if(this.bossRoomEntered && this.bossRoomEnemies) {
             this.bossRoomEnemies = this.bossRoomEnemies.filter(enemy => enemy !== enemyToRemove);
+        
+            if(this.bossRoomEnemies.length === 0) {
+                this.bossRoomExitWallTiles.forEach(tile => tile.destroy());
+                this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
+                // TODO: if time, put in pan/zoomTo transition
+            }
         }
     }
     
@@ -412,6 +444,31 @@ class Room1Scene extends Phaser.Scene {
         });
     }
 
+    // ------------- Spawning things in game -------------- //
+    buildWallTiles(wallObj) {
+        const wallCentered = this.getObjectCenter(wallObj);
+        const tileSize = 16;
+        const tileCount = 4;
+        const tiles = [];
+
+        for(let i = 0; i <= tileCount; i++) {
+            const tile = this.add.tileSprite(
+                wallCentered.x,
+                wallObj.y + (i * tileSize),
+                tileSize,
+                tileSize,
+                'purple-tileset',
+                11
+            );
+
+            this.physics.add.existing(tile, true);
+            this.physics.add.collider(this.player.sprite, tile);
+            tiles.push(tile);
+        }
+
+        return tiles;
+    }
+
     spawnDoorLight(x, y) {
         const emitter = this.add.particles(x, y, 'light-particle', {
             speed: { min: 5, max: 20 },
@@ -468,31 +525,12 @@ class Room1Scene extends Phaser.Scene {
         );
         
         this.bossRoomEnemies.push(boss);
-
+        this.bossRoomExitWallTiles = this.buildWallTiles(this.bossRoomWallExitObj);
         this.sealBossRoom();
     }
 
     sealBossRoom() {
-        const bossRoomOneWallCentered = this.getObjectCenter(this.bossRoomOneWallTrigger);
-        const tileSize = 16;
-        const tileCount = 4;
-        
-        const bossRoomOneWallTiles = [];
-
-        for(let i = 0; i <= tileCount; i++) {
-            const tile = this.add.tileSprite(
-                bossRoomOneWallCentered.x - 56,
-                this.bossRoomOneWallTrigger.y + (i * tileSize),
-                tileSize,
-                tileSize,
-                'purple-tileset',
-                11
-            );
-            
-            this.physics.add.existing(tile, true);
-            this.physics.add.collider(this.player.sprite, tile);
-            bossRoomOneWallTiles.push(tile);
-        }
+        this.bossRoomEntranceWallTiles = this.buildWallTiles(this.bossRoomWallEntranceObj);
     }
 
     // ------- HELPERS -------- //
