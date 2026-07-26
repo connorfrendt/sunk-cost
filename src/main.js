@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import Player from './Player.js';
 import Enemy from './Enemy.js';
-import { cardData } from './upgrades.js'
+import { cardData, TICK_COUNT, TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS } from './upgrades.js'
 
 class Room1Scene extends Phaser.Scene {
     constructor() {
@@ -27,6 +27,10 @@ class Room1Scene extends Phaser.Scene {
             frameHeight: 144,
         });
         this.load.spritesheet('brazier', '/assets/tilemaps/brazier.png', {
+            frameWidth: 16,
+            frameHeight: 16,
+        });
+        this.load.spritesheet('chest', '/assets/tilemaps/chest.png', {
             frameWidth: 16,
             frameHeight: 16,
         });
@@ -98,6 +102,29 @@ class Room1Scene extends Phaser.Scene {
             const brazier = this.add.sprite(brazierCenter.x, brazierCenter.y, 'brazier');
             brazier.play('brazier');
         });
+
+        // Spawn Chests
+        this.chests = [];
+
+        const chestSpawns = this.spawnLayer.objects.filter(obj => obj.name === 'chest');
+        chestSpawns.forEach(point => {
+            this.chestCenter = this.getObjectCenter(point);
+            this.chest = this.add.sprite(this.chestCenter.x, this.chestCenter.y, 'chest');
+        });
+
+        const chest = {
+            sprite: this.add.sprite(this.chestCenter.x, this.chestCenter.y, 'chest'),
+            isOpen: false,
+            playerNearby: false,
+        };
+
+        const chestZone = this.add.rectangle(this.chestCenter.x, this.chestCenter.y, 24, 24, 0xffff00, 0);
+        this.physics.add.existing(chestZone, true);
+        this.physics.add.overlap(this.player.sprite, chestZone, () => {
+            chest.playerNearby = true;
+        }, null, this);
+
+        this.chests.push(chest);
 
         this.roomDifficulty = 1; // Room 1 = 1, Room 2 = 1.3, Room 3 = 1.6, etc. tune per room
 
@@ -193,6 +220,9 @@ class Room1Scene extends Phaser.Scene {
             this.debugZoomedOut = !this.debugZoomedOut;
             this.cameras.main.setZoom(this.debugZoomedOut ? 0.3 : 1);
         }
+        // --------------------------------------------------
+
+        
 
         // Enemy Health Bar/Visuals
         this.enemies.forEach(enemy => {
@@ -255,7 +285,7 @@ class Room1Scene extends Phaser.Scene {
                 this.player.attackCooldown -= this.game.loop.delta;
             }
             
-            // Attack
+            // ---- ATTACKING LOGIC HERE ---- //
             if(this.player.attackRequested && this.player.attackCooldown <= 0) {
                 this.player.isAttacking = true;
                 this.player.sprite.play(this.player.lastDirectionFaced === 'left' ? 'ninja-attack-left' : 'ninja-attack-right', true);
@@ -268,7 +298,13 @@ class Room1Scene extends Phaser.Scene {
                     );
 
                     if(distance <= this.player.attackRange) {
-                        enemy.takeDamage(10, this.player.sprite);
+                        const totalDamage = this.player.baseDamage + this.player.bonusDamage;
+                        enemy.takeDamage(totalDamage, this.player.sprite);
+                        
+                        if(this.player.hasTickingDamage) {
+                            enemy.applyTickingDamage(TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS, TICK_COUNT);
+                        }
+                        
                         this.showHitEffect(enemy.sprite.x, enemy.sprite.y);
                         this.flashHit(enemy.sprite);
                     }
@@ -399,6 +435,18 @@ class Room1Scene extends Phaser.Scene {
 
     chooseUpgrade(index) {
         console.log('Chose upgrade index: ', index);
+
+        const chosenCard = cardData[index];
+
+        // --- UPGRADE CHOICES HERE --- //
+        if(chosenCard.id === 'damage') {
+            this.player.addBonusDamage(chosenCard.amount);
+        }
+
+        if(chosenCard.id === 'ticking') {
+            this.player.enableTickingDamage();
+        }
+
         this.upgradeCards.forEach(({ bg, title, desc }) => {
             bg.destroy();
             title.destroy();
@@ -412,11 +460,6 @@ class Room1Scene extends Phaser.Scene {
 
         this.physics.resume();
         this.gamePaused = false;
-
-        // Open the path forward and signal it visually
-        // const doorLightPoint = this.spawnLayer.objects.find(obj => obj.name === 'door-light');
-        // const doorLightCenter = this.getObjectCenter(doorLightPoint);
-        // this.spawnDoorLight(doorLightCenter.x, doorLightCenter.y);
     }
 
     // --------- PLATFORMS --------- //

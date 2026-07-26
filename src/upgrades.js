@@ -1,4 +1,19 @@
+export const DAMAGE_BONUS_AMOUNT = 30;
+
+export const TICK_DAMAGE_AMOUNT = 5;
+export const TICK_INTERVAL_MS = 1000;
+export const TICK_COUNT = 5;
+
 export const cardData = [
-    { title: '+30 DAMAGE', desc: 'Adds +30 damage per hit' },
-    { title: 'TICKING DAMAGE', desc: '5 damage per second until the enemy dies' },
+    {
+        id: 'damage',
+        title: `+${DAMAGE_BONUS_AMOUNT} DAMAGE`,
+        desc: `Adds +${DAMAGE_BONUS_AMOUNT} damage per hit`,
+        amount: DAMAGE_BONUS_AMOUNT,
+    },
+    {
+        id: 'ticking',
+        title: `TICKING DAMAGE`,
+        desc: `On hit, deals ${TICK_DAMAGE_AMOUNT} damage per second for ${TICK_COUNT} seconds`,
+    },
 ];

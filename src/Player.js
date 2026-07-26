@@ -6,9 +6,6 @@ export default class Player {
         this.hp = 100;
         this.maxHp = 100;
         this.speed = 250;
-        this.alive = true;
-        this.invulnerable = false;
-        this.abilities = [];
         this.attackRange = 85;
         
         // Visual
@@ -39,6 +36,22 @@ export default class Player {
         this.attackRequested = false
         this.attackCooldown = 0;
         this.attackCooldownDuration = 250; // ms
+        this.baseDamage = 10;
+        this.bonusDamage = 0;
+
+        // Properties
+        this.invulnerable = false;
+        this.alive = true;
+        this.abilities = [];
+        this.hasTickingDamage = false;
+    }
+
+    addBonusDamage(amount) {
+        this.bonusDamage += amount;
+    }
+
+    enableTickingDamage() {
+        this.hasTickingDamage = true;
     }
 
     takeDamage(amount) {

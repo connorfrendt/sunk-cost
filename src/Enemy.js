@@ -17,7 +17,8 @@ export default class Enemy {
         // Attacking
         this.isAttacking = false;
         this.attackCooldown = 0;
-        this.attackInterval = 1500; // ms between attacks
+        this.attackInterval = 200; // ms between attacks
+        // this.attackInterval is what I was changing
         this.attackDamage = config.attackDamage || 10;
 
         this.chaseRange = 600; // How far away the enemy notices the player
@@ -152,7 +153,7 @@ export default class Enemy {
         if(distance <= this.stopRange) {
             this.attackCooldown -= delta;
             
-            if(this.attackCooldown <= 0) {
+            if(this.attackCooldown <= 0 && !this.isAttacking) {
                 this.isAttacking = true;
                 const facingKey = this.sprite.x < player.sprite.x ? 'enemy-attack-right' : 'enemy-attack-left';
                 this.sprite.play(facingKey, true);
@@ -182,6 +183,30 @@ export default class Enemy {
             this.die();
             return;
         }
+    }
+
+    applyTickingDamage(damagePerTick, intervalMs, tickCount) {
+        // Clear any existing dot timer first, so reapplying doesn't stack multiple times
+        if(this.dotTimer) {
+            this.dotTimer.remove();
+        }
+
+        this.dotTimer = this.scene.time.addEvent({
+            delay: intervalMs,
+            repeat: tickCount - 1,
+            callback: () => {
+                if(!this.alive) {
+                    this.dotTimer.remove();
+                    return;
+                }
+
+                this.hp -= damagePerTick;
+                this.updateHpBar();
+                if(this.hp <= 0) {
+                    this.die();
+                }
+            }
+        })
     }
 
     knockback(source) {
