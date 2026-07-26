@@ -99,15 +99,17 @@ class Room1Scene extends Phaser.Scene {
             brazier.play('brazier');
         });
 
+        this.roomDifficulty = 1; // Room 1 = 1, Room 2 = 1.3, Room 3 = 1.6, etc. tune per room
+
         // Spawn First Enemy
         this.enemies = [];
         const enemySpawnPoints = this.spawnLayer.objects.filter(obj => obj.name === 'enemy-spawn');
         enemySpawnPoints.forEach(point => {
-            this.spawnEnemy(point.x + point.width / 2, point.y + point.height / 2, {
+            this.spawnEnemy(point.x + point.width / 2, point.y + point.height / 2, this.scaledEnemyConfig({
                 name: 'Enemeanie',
                 hp: 30,
                 maxHp: 30,
-            });
+            }));
         });
 
         // Door Light
@@ -516,12 +518,12 @@ class Room1Scene extends Phaser.Scene {
         const boss = this.spawnEnemy(
             this.bossSpawnPoint.x,
             this.bossSpawnPoint.y,
-            { 
+            this.scaledEnemyConfig({ 
                 name: 'Boss',
                 hp: 50,
                 maxHp: 50,
                 isBoss: true,
-            }
+            })
         );
         
         this.bossRoomEnemies.push(boss);
@@ -539,6 +541,15 @@ class Room1Scene extends Phaser.Scene {
             x: obj.x + obj.width / 2,
             y: obj.y + obj.height / 2,
         };
+    }
+
+    scaledEnemyConfig(baseConfig) {
+        return {
+            ...baseConfig,
+            hp: Math.round(baseConfig.hp * this.roomDifficulty),
+            maxHp: Math.round(baseConfig.maxHp * this.roomDifficulty),
+            attackDamage: Math.round((baseConfig.attackDamage || 10) * this.roomDifficulty)
+        }
     }
 }
 
