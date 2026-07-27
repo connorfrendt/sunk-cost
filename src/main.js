@@ -1,15 +1,16 @@
 import Phaser from 'phaser';
+import TitleScene from './Title.js';
+import ControlsScene from './Controls.js';
 import Player from './Player.js';
 import Enemy from './Enemy.js';
 import { cardData, TICK_COUNT, TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS } from './upgrades.js'
 
-class Room1Scene extends Phaser.Scene {
+class GameScene extends Phaser.Scene {
     constructor() {
         super({ key: 'GameScene' });
     }
 
     preload() {
-        // Ninja 
         this.load.spritesheet('ninja-idle', '/assets/characters/ninja-idle.png', {
             frameWidth: 144,
             frameHeight: 144,
@@ -108,23 +109,24 @@ class Room1Scene extends Phaser.Scene {
 
         const chestSpawns = this.spawnLayer.objects.filter(obj => obj.name === 'chest');
         chestSpawns.forEach(point => {
-            this.chestCenter = this.getObjectCenter(point);
-            this.chest = this.add.sprite(this.chestCenter.x, this.chestCenter.y, 'chest');
+            const chestCenter = this.getObjectCenter(point);
+        
+            const chest = {
+                sprite: this.add.sprite(chestCenter.x, chestCenter.y, 'chest', 0),
+                isOpen: false,
+                playerNearby: false,
+            };
+        
+            const chestZone = this.add.rectangle(chestCenter.x, chestCenter.y, 24, 24, 0xffff00, 0);
+            this.physics.add.existing(chestZone, true);
+            this.physics.add.overlap(this.player.sprite, chestZone, () => {
+                chest.playerNearby = true;
+            }, null, this);
+    
+            this.chests.push(chest);
         });
 
-        const chest = {
-            sprite: this.add.sprite(this.chestCenter.x, this.chestCenter.y, 'chest'),
-            isOpen: false,
-            playerNearby: false,
-        };
 
-        const chestZone = this.add.rectangle(this.chestCenter.x, this.chestCenter.y, 24, 24, 0xffff00, 0);
-        this.physics.add.existing(chestZone, true);
-        this.physics.add.overlap(this.player.sprite, chestZone, () => {
-            chest.playerNearby = true;
-        }, null, this);
-
-        this.chests.push(chest);
 
         this.roomDifficulty = 1; // Room 1 = 1, Room 2 = 1.3, Room 3 = 1.6, etc. tune per room
 
@@ -141,7 +143,7 @@ class Room1Scene extends Phaser.Scene {
 
         // Door Light
         const particleGraphics = this.make.graphics();
-        particleGraphics.fillStyle(0xfff4c2, 1);
+        particleGraphics.fillStyle(0x8effc1, 1);
         particleGraphics.fillCircle(4, 4, 4) // small 8x8 soft dot
         particleGraphics.generateTexture('light-particle', 8, 8);
         particleGraphics.destroy();
@@ -163,8 +165,8 @@ class Room1Scene extends Phaser.Scene {
 
         this.input.mouse.disableContextMenu();
 
-        this.zoomKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
-        this.debugZoomedOut = false;
+        // this.zoomKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
+        // this.debugZoomedOut = false;
 
         this.physics.add.collider(this.player.sprite, this.groundLayer);
 
@@ -210,19 +212,32 @@ class Room1Scene extends Phaser.Scene {
         this.input.keyboard.on('keydown-X', () => {
             this.player.attackRequested = true;
         });
+
+        this.vKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V);
     }
 
     update() {
         if(this.gamePaused) return;
 
         // For seeing rooms - TAKE OUT WHEN GOING LIVE: TODO
-        if(Phaser.Input.Keyboard.JustDown(this.zoomKey)) {
-            this.debugZoomedOut = !this.debugZoomedOut;
-            this.cameras.main.setZoom(this.debugZoomedOut ? 0.3 : 1);
-        }
+        // if(Phaser.Input.Keyboard.JustDown(this.zoomKey)) {
+        //     this.debugZoomedOut = !this.debugZoomedOut;
+        //     this.cameras.main.setZoom(this.debugZoomedOut ? 0.3 : 1);
+        // }
         // --------------------------------------------------
 
-        
+        // Chest Interaction
+        this.chests.forEach(chest => {
+            if(!chest.playerNearby || chest.isOpen) {
+                return;
+            }
+
+            if(Phaser.Input.Keyboard.JustDown(this.vKey)) {
+                this.openChest(chest);
+            }
+        });
+
+        this.chests.forEach(chest => chest.playerNearby = false);
 
         // Enemy Health Bar/Visuals
         this.enemies.forEach(enemy => {
@@ -330,6 +345,17 @@ class Room1Scene extends Phaser.Scene {
                 enemy.patrol();
             }
         });
+    }
+
+    // ------------------ INTERACTIONS ------------------- //
+    openChest(chest) {
+        chest.isOpen = true;
+        chest.sprite.setFrame(1);
+
+        const healAmount = Math.round(this.player.maxHp * 0.25);
+        this.player.heal(healAmount);
+
+        this.spawnChestHealEffects(this.player.sprite.x, this.player.sprite.y);
     }
 
     // ------------------ ENEMY FUNCTIONS ------------------ //
@@ -489,6 +515,26 @@ class Room1Scene extends Phaser.Scene {
         });
     }
 
+    spawnChestHealEffects(x, y) {
+        const emitter = this.add.particles(x, y, 'light-particle', {
+            speed: { min: 20, max: 40 },
+            angle: { min: 250, max: 290},
+            scale: { start: 0.6, end: 0 },
+            alpha: { start: 0.9, end: 0 },
+            lifespan: 800,
+            quantity: 2,
+            frequency: 40,
+            blendMode: 'ADD',
+            emitZone: {
+                type: 'random',
+                source: new Phaser.Geom.Rectangle(-16, -20, 32, 32),
+            }
+        });
+        emitter.setDepth(10);
+        this.time.delayedCall(500, () => emitter.stop());
+        this.time.delayedCall(1300, () => emitter.destroy());
+    }
+
     // ------------- Spawning things in game -------------- //
     buildWallTiles(wallObj) {
         const wallCentered = this.getObjectCenter(wallObj);
@@ -514,26 +560,26 @@ class Room1Scene extends Phaser.Scene {
         return tiles;
     }
 
-    spawnDoorLight(x, y) {
-        const emitter = this.add.particles(x, y, 'light-particle', {
-            speed: { min: 5, max: 20 },
-            scale: { start: 0.6, end: 0 },
-            alpha: { start: 0.7, end: 0 },
-            lifespan: 1200,
-            frequency: 150,
-            blendMode: 'ADD',
-        });
+    // spawnDoorLight(x, y) {
+    //     const emitter = this.add.particles(x, y, 'light-particle', {
+    //         speed: { min: 5, max: 20 },
+    //         scale: { start: 0.6, end: 0 },
+    //         alpha: { start: 0.7, end: 0 },
+    //         lifespan: 1200,
+    //         frequency: 150,
+    //         blendMode: 'ADD',
+    //     });
 
-        emitter.setAlpha(0);
-        this.tweens.add({
-            targets: emitter,
-            alpha: 1,
-            duration: 800,
-            ease: 'Sine.easeIn',
-        });
+    //     emitter.setAlpha(0);
+    //     this.tweens.add({
+    //         targets: emitter,
+    //         alpha: 1,
+    //         duration: 800,
+    //         ease: 'Sine.easeIn',
+    //     });
 
-        return emitter;
-    }
+    //     return emitter;
+    // }
 
     // -------- BOSS ROOM STUFF ---------- //
     /*
@@ -596,6 +642,8 @@ class Room1Scene extends Phaser.Scene {
     }
 }
 
+
+
 const config = {
     type: Phaser.AUTO,
     parent: 'game-container',
@@ -615,7 +663,7 @@ const config = {
             debug: false,
         }
     },
-    scene: Room1Scene,
+    scene: [TitleScene, ControlsScene, GameScene],
 }
 
 const game = new Phaser.Game(config);

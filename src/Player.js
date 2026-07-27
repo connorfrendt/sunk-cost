@@ -73,6 +73,11 @@ export default class Player {
         this.updateHpBar();
     }
 
+    heal(amount) {
+        this.hp = Math.min(this.hp + amount, this.maxHp);
+        this.updateHpBar();
+    }
+
     updateHpBar() {
         const pct = this.hp / this.maxHp;
         this.hpBar.scaleX = pct;
