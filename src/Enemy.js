@@ -17,8 +17,7 @@ export default class Enemy {
         // Attacking
         this.isAttacking = false;
         this.attackCooldown = 0;
-        this.attackInterval = 200; // ms between attacks
-        // this.attackInterval is what I was changing
+        this.attackInterval = 1000; // ms between attacks
         this.attackDamage = config.attackDamage || 10;
 
         this.chaseRange = 600; // How far away the enemy notices the player
@@ -31,6 +30,8 @@ export default class Enemy {
         this.sprite = scene.add.sprite(x, y, 'enemy-idle', 0);
         this.sprite.play('enemy-idle-right');
         scene.physics.add.existing(this.sprite);
+        this.scale = config.scale || 1;
+        this.sprite.setScale(this.scale);
         this.sprite.body.setSize(32, 32);
         this.sprite.body.setCollideWorldBounds(true);
 
@@ -240,9 +241,9 @@ export default class Enemy {
         this.hpBarBg.setVisible(false);
         this.scene.removeEnemyFromArray(this);
         
-        if(this.isBoss) {
-            this.scene.showUpgradeChoice();
-        }
+        // if(this.isBoss) {
+        //     this.scene.showUpgradeChoice();
+        // }
     }
 
     destroy() {

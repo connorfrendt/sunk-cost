@@ -4,6 +4,7 @@ import ControlsScene from './Controls.js';
 import Player from './Player.js';
 import Enemy from './Enemy.js';
 import { cardData, TICK_COUNT, TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS } from './upgrades.js'
+import SageNinja from './SageNinja.js';
 
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -18,6 +19,10 @@ class GameScene extends Phaser.Scene {
         this.load.spritesheet('ninja-attack', '/assets/characters/ninja-attack.png', {
             frameWidth: 144,
             frameHeight: 144,
+        });
+        this.load.spritesheet('sage-ninja', '/assets/characters/sage-ninja.png', {
+            frameWidth: 36,
+            frameHeight: 36,
         });
         this.load.spritesheet('enemy-idle', '/assets/characters/enemeanie-idle.png', {
             frameWidth: 144,
@@ -46,6 +51,9 @@ class GameScene extends Phaser.Scene {
         // Animation Creation
         this.anims.create({ key: 'ninja-idle-left', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 8, end: 15 }), frameRate: 4, repeat: -1 });
         this.anims.create({ key: 'ninja-idle-right', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 0, end: 7 }), frameRate: 4, repeat: -1 });
+        
+        this.anims.create({ key: 'sage-ninja-left', frames: this.anims.generateFrameNumbers('sage-ninja', { start: 0, end: 3 }), frameRate: 1, repeat: -1 });
+        this.anims.create({ key: 'sage-ninja-right', frames: this.anims.generateFrameNumbers('sage-ninja', { start: 4, end: 7 }), frameRate: 1, repeat: -1 });
         
         this.anims.create({ key: 'ninja-attack-left', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 0, end: 2 }), frameRate: 12, repeat: 0 });
         this.anims.create({ key: 'ninja-attack-right', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 3, end: 5 }), frameRate: 12, repeat: 0 });
@@ -92,6 +100,13 @@ class GameScene extends Phaser.Scene {
         const playerSpawnCentered = this.getObjectCenter(playerSpawn);
         this.player = new Player(this, playerSpawnCentered.x, playerSpawnCentered.y);
 
+        // Spawn NPC Sage Ninja
+        this.sageNinjaPoints = this.spawnLayer.objects.filter(obj => obj.name === 'sage-ninja');
+        this.sageNinjaPoints.map(point => {
+            const sageNinjaCenter = this.getObjectCenter(point);
+            return new SageNinja(this, sageNinjaCenter.x, sageNinjaCenter.y);
+        });
+
         // Grab boss wall objects
         this.bossRoomWallEntranceObj = this.spawnLayer.objects.find(obj => obj.name === 'boss-room-one-wall-entrance');
         this.bossRoomWallExitObj = this.spawnLayer.objects.find(obj => obj.name === 'boss-room-one-wall-exit');
@@ -125,8 +140,6 @@ class GameScene extends Phaser.Scene {
     
             this.chests.push(chest);
         });
-
-
 
         this.roomDifficulty = 1; // Room 1 = 1, Room 2 = 1.3, Room 3 = 1.6, etc. tune per room
 
@@ -190,7 +203,6 @@ class GameScene extends Phaser.Scene {
 
         // Add physics to player/enemy
         this.physics.add.existing(this.player.sprite);
-
         this.enemies.forEach(enemy => this.physics.add.existing(enemy.sprite));
         this.player.sprite.body.setSize(25, 32);
         this.player.sprite.body.setCollideWorldBounds(true);
@@ -241,7 +253,9 @@ class GameScene extends Phaser.Scene {
 
         // Enemy Health Bar/Visuals
         this.enemies.forEach(enemy => {
-            if(enemy.alive) enemy.syncVisuals();
+            if(enemy.alive) {
+                enemy.syncVisuals();
+            }
         });
 
         if(this.player.alive) {
@@ -560,27 +574,6 @@ class GameScene extends Phaser.Scene {
         return tiles;
     }
 
-    // spawnDoorLight(x, y) {
-    //     const emitter = this.add.particles(x, y, 'light-particle', {
-    //         speed: { min: 5, max: 20 },
-    //         scale: { start: 0.6, end: 0 },
-    //         alpha: { start: 0.7, end: 0 },
-    //         lifespan: 1200,
-    //         frequency: 150,
-    //         blendMode: 'ADD',
-    //     });
-
-    //     emitter.setAlpha(0);
-    //     this.tweens.add({
-    //         targets: emitter,
-    //         alpha: 1,
-    //         duration: 800,
-    //         ease: 'Sine.easeIn',
-    //     });
-
-    //     return emitter;
-    // }
-
     // -------- BOSS ROOM STUFF ---------- //
     /*
     BOSS ROOM NEEDS TO BE: 40 tiles wide x 22 tiles high
@@ -612,7 +605,10 @@ class GameScene extends Phaser.Scene {
                 hp: 50,
                 maxHp: 50,
                 isBoss: true,
-            })
+                attackDamage: 30,
+                attackInterval: 500,
+                scale: 2,
+            }),
         );
         
         this.bossRoomEnemies.push(boss);
@@ -660,7 +656,7 @@ const config = {
         default: 'arcade',
         arcade: {
             gravity: { y: 2000 },
-            debug: false,
+            debug: true,
         }
     },
     scene: [TitleScene, ControlsScene, GameScene],
