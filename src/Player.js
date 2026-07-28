@@ -17,11 +17,11 @@ export default class Player {
         this.hpBarBg = scene.add.rectangle(20, 20, 150, 20, 0x440000)
             .setOrigin(0, 0.5)
             .setScrollFactor(0)
-            .setDepth(100);
+            .setDepth(50);
         this.hpBar = scene.add.rectangle(20, 20, 150, 20, 0x00ff00)
             .setOrigin(0, 0.5)
             .setScrollFactor(0)
-            .setDepth(100);
+            .setDepth(50);
         this.hpText = scene.add.text(70, 30, `${this.hp} / ${this.maxHp}`, {
             fontFamily: 'arial',
             fontSize: '12px',
@@ -29,7 +29,7 @@ export default class Player {
             resolution: 3,
         })
             .setScrollFactor(0)
-            .setDepth(100);
+            .setDepth(50);
 
         // Attacking
         this.isAttacking = false;
@@ -67,7 +67,7 @@ export default class Player {
 
         if(this.hp <= 0) {
             this.hp = 0;
-            // this.die();
+            this.die();
         }
 
         this.updateHpBar();
@@ -82,5 +82,11 @@ export default class Player {
         const pct = this.hp / this.maxHp;
         this.hpBar.scaleX = pct;
         this.hpText.setText(`${this.hp} / ${this.maxHp}`);
+    }
+
+    die() {
+        this.alive = false;
+        this.sprite.body.setVelocity(0, 0);
+        this.scene.handlePlayerDeath();
     }
 }

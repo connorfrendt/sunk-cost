@@ -7,6 +7,23 @@ export default class SageNinja {
         this.sprite.play('sage-ninja-left');
 
         this.hasBeenTalkedTo = false;
+        this.playerNearby = false;
+    }
+
+    tryInteract(vKeyJustPressed, player) {
+        const distance = Phaser.Math.Distance.Between(
+            player.sprite.x, player.sprite.y,
+            this.sprite.x, this.sprite.y
+        );
+        this.playerNearby = distance <= 40;
+
+        if(!this.playerNearby || this.hasBeenTalkedTo) {
+            return;
+        }
+
+        if(vKeyJustPressed) {
+            this.triggerDialogue();
+        }
     }
 
     faceTowardPlayer(player) {
@@ -16,6 +33,7 @@ export default class SageNinja {
 
     triggerDialogue() {
         this.hasBeenTalkedTo = true;
-        // dialogue/upgrade choice logic goes here
+        this.scene.showDialogue(this.scene.sageNinjaEncounterCount);
+        this.scene.sageNinjaEncounterCount++;
     }
 }

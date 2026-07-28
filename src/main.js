@@ -1,10 +1,15 @@
 import Phaser from 'phaser';
+
 import TitleScene from './Title.js';
 import ControlsScene from './Controls.js';
+
 import Player from './Player.js';
-import Enemy from './Enemy.js';
-import { cardData, TICK_COUNT, TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS } from './upgrades.js'
 import SageNinja from './SageNinja.js';
+import Enemy from './Enemy.js';
+
+import { sageNinjaDialogueLines } from './SageNinjaDialogue.js';
+
+import { cardData, TICK_COUNT, TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS } from './upgrades.js'
 
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -29,6 +34,10 @@ class GameScene extends Phaser.Scene {
             frameHeight: 144,
         });
         this.load.spritesheet('enemy-attack', '/assets/characters/enemeanie-attack.png', {
+            frameWidth: 144,
+            frameHeight: 144,
+        });
+        this.load.spritesheet('enemy-hurt', '/assets/characters/enemeanie-hurt.png', {
             frameWidth: 144,
             frameHeight: 144,
         });
@@ -60,6 +69,9 @@ class GameScene extends Phaser.Scene {
         
         this.anims.create({ key: 'enemy-idle-left', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 6, end: 11 }), frameRate: 3, repeat: -1 });
         this.anims.create({ key: 'enemy-idle-right', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 0, end: 5 }), frameRate: 3, repeat: -1 });
+        
+        this.anims.create({ key: 'enemy-hurt-left', frames: this.anims.generateFrameNumbers('enemy-hurt', { start: 1, end: 1 }), frameRate: 4, repeat: 0 });
+        this.anims.create({ key: 'enemy-hurt-right', frames: this.anims.generateFrameNumbers('enemy-hurt', { start: 0, end: 0 }), frameRate: 4, repeat: 0 });
 
         this.anims.create({
             key: 'enemy-attack-right',
@@ -92,20 +104,46 @@ class GameScene extends Phaser.Scene {
         this.groundLayer = map.createLayer('Tile Layer 1', purpleTileSet, 0, 0);
         this.groundLayer.setCollisionByProperty({ collides: true });
 
+        
         // Grabs all the object spawns in from Tiled
         this.spawnLayer = map.getObjectLayer('Spawn Layer');
-
+        
         // Spawns Player
         const playerSpawn = this.spawnLayer.objects.find(obj => obj.name === 'player-spawn');
         const playerSpawnCentered = this.getObjectCenter(playerSpawn);
         this.player = new Player(this, playerSpawnCentered.x, playerSpawnCentered.y);
 
-        // Spawn NPC Sage Ninja
+        // Respawn Points
+        const beginningRespawn = this.spawnLayer.objects.find(obj => obj.name === 'beginning-respawn-point');
+        const beginningRespawnCentered = this.getObjectCenter(beginningRespawn);
+        this.currentRespawnPoint = {
+            x: beginningRespawnCentered.x,
+            y: beginningRespawnCentered.y,
+        }
+
+        const respawnOneTrigger = this.spawnLayer.objects.find(obj => obj.name === 'respawn-one-trigger');
+        const respawnOneTriggerCentered = this.getObjectCenter(respawnOneTrigger);
+        const respawnZoneOne = this.add.rectangle(respawnOneTriggerCentered.x, respawnOneTriggerCentered.y, respawnOneTrigger.width, respawnOneTrigger.height, 0xff0000, 0);
+
+        this.physics.add.existing(respawnZoneOne, true);
+        this.physics.add.overlap(this.player.sprite, respawnZoneOne, () => {
+            const respawnPointOneCentered = this.getObjectCenter(respawnPointOne);
+            this.currentRespawnPoint = {
+                x: respawnPointOneCentered.x,
+                y: respawnPointOneCentered.y,
+            }
+        })
+
+        const respawnPointOne = this.spawnLayer.objects.find(obj => obj.name === 'respawn-point-one');
+
+        // ----------- SAGE NINJA STUFF ----------- //
         this.sageNinjaPoints = this.spawnLayer.objects.filter(obj => obj.name === 'sage-ninja');
-        this.sageNinjaPoints.map(point => {
+        this.sageNinjas = this.sageNinjaPoints.map(point => {
             const sageNinjaCenter = this.getObjectCenter(point);
             return new SageNinja(this, sageNinjaCenter.x, sageNinjaCenter.y);
         });
+
+        this.sageNinjaEncounterCount = 0;
 
         // Grab boss wall objects
         this.bossRoomWallEntranceObj = this.spawnLayer.objects.find(obj => obj.name === 'boss-room-one-wall-entrance');
@@ -129,14 +167,7 @@ class GameScene extends Phaser.Scene {
             const chest = {
                 sprite: this.add.sprite(chestCenter.x, chestCenter.y, 'chest', 0),
                 isOpen: false,
-                playerNearby: false,
             };
-        
-            const chestZone = this.add.rectangle(chestCenter.x, chestCenter.y, 24, 24, 0xffff00, 0);
-            this.physics.add.existing(chestZone, true);
-            this.physics.add.overlap(this.player.sprite, chestZone, () => {
-                chest.playerNearby = true;
-            }, null, this);
     
             this.chests.push(chest);
         });
@@ -238,18 +269,32 @@ class GameScene extends Phaser.Scene {
         // }
         // --------------------------------------------------
 
-        // Chest Interaction
+        // INTERACTION STUFFS
+        const vKeyJustPressed = Phaser.Input.Keyboard.JustDown(this.vKey);
         this.chests.forEach(chest => {
+            const distance = Phaser.Math.Distance.Between(
+                this.player.sprite.x, this.player.sprite.y,
+                chest.sprite.x, chest.sprite.y
+            );
+
+            chest.playerNearby = distance <= 40;
+            
             if(!chest.playerNearby || chest.isOpen) {
                 return;
             }
 
-            if(Phaser.Input.Keyboard.JustDown(this.vKey)) {
+            if(vKeyJustPressed) {
                 this.openChest(chest);
             }
         });
 
-        this.chests.forEach(chest => chest.playerNearby = false);
+        this.chests.forEach(chest => {
+            return chest.playerNearby = false;
+        });
+
+        this.sageNinjas.forEach(ninja => {
+            ninja.tryInteract(vKeyJustPressed, this.player);
+        });
 
         // Enemy Health Bar/Visuals
         this.enemies.forEach(enemy => {
@@ -360,6 +405,20 @@ class GameScene extends Phaser.Scene {
             }
         });
     }
+    // ------------------ Player Death ------------------- //
+    handlePlayerDeath() {
+        this.time.delayedCall(1000, () => {
+            this.cameras.main.fadeOut(500, 0, 0, 0);
+
+            this.cameras.main.once('camerafadeoutcomplete', () => {
+                this.player.sprite.setPosition(this.currentRespawnPoint.x, this.currentRespawnPoint.y);
+                this.player.heal(this.player.maxHp);
+                this.player.alive = true;
+
+                this.cameras.main.fadeIn(500, 0, 0, 0);
+            });
+        });
+    }
 
     // ------------------ INTERACTIONS ------------------- //
     openChest(chest) {
@@ -389,12 +448,65 @@ class GameScene extends Phaser.Scene {
             if(this.bossRoomEnemies.length === 0) {
                 this.bossRoomExitWallTiles.forEach(tile => tile.destroy());
                 this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
+                this.bossRoomEntered = false;
+                this.bossRoomEnemies = null;
                 // TODO: if time, put in pan/zoomTo transition
             }
         }
     }
     
     // ------------------- UPGRADE CHOICES ---------------- //
+    showDialogue(lineIndex) {
+        this.gamePaused = true;
+        this.physics.pause();
+
+        const { width, height } = this.cameras.main;
+        const zoom = this.cameras.main.zoom;
+
+        this.dialogueOverlay = this.add.rectangle(width / 2, height / 2, width / zoom, height / zoom, 0x000000, 0.7)
+            .setScrollFactor(0)
+            .setDepth(90);
+
+        const lineText = sageNinjaDialogueLines[Math.min(lineIndex, sageNinjaDialogueLines.length - 1)];
+
+        this.dialogueText = this.add.text(width / 2, height / 2 - 20, lineText, {
+            fontFamily: 'monospace',
+            fontSize: '16px',
+            color: '#ffffff',
+            align: 'center',
+            resolution: 3,
+            wordWrap: {
+                width: width - 80
+            },
+        })
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(101);
+
+        this.dialoguePrompt = this.add.text(width / 2, height - 40, 'Press SPACE to Continue', {
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            color: '#fbbf24',
+            resolution: 3,
+        })
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(101);
+
+        // this.sound.play(`sage-ninja-line-${Math.min(lineIndex, sageNinjaDialogueLines.length - 1)}`);
+
+        this.input.keyboard.once('keydown-SPACE', () => {
+            this.dialogueOverlay.destroy();
+            this.dialogueText.destroy();
+            this.dialoguePrompt.destroy();
+
+            this.physics.resume();
+            this.gamePaused = false;
+
+            this.showUpgradeChoice();
+        });
+    }
+
     showUpgradeChoice() {
         this.gamePaused = true;
         this.physics.pause();
@@ -656,7 +768,7 @@ const config = {
         default: 'arcade',
         arcade: {
             gravity: { y: 2000 },
-            debug: true,
+            debug: false,
         }
     },
     scene: [TitleScene, ControlsScene, GameScene],

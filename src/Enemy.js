@@ -13,6 +13,8 @@ export default class Enemy {
         this.chaseDirection = 1; // persist across frames, only updates when there's a clear direction
         this.isKnockedBack = false;
         this.knockbackDuration = 150; // ms
+        this.scale = config.scale || 1;
+        this.isHurt = false;
 
         // Attacking
         this.isAttacking = false;
@@ -21,16 +23,15 @@ export default class Enemy {
         this.attackDamage = config.attackDamage || 10;
 
         this.chaseRange = 600; // How far away the enemy notices the player
-        this.stopRange = 30; // Don't walk into the center of the player, stand at melee range
+        this.stopRange = 35 * this.scale; // Don't walk into the center of the player, stand at melee range
         this.speed = 80; // pixels per second
         this.jumpVelocity = -750;
-        this.horizontalDeadzone = 10;
+        this.horizontalDeadzone = 10 * this.scale;
 
         // Visual
         this.sprite = scene.add.sprite(x, y, 'enemy-idle', 0);
         this.sprite.play('enemy-idle-right');
         scene.physics.add.existing(this.sprite);
-        this.scale = config.scale || 1;
         this.sprite.setScale(this.scale);
         this.sprite.body.setSize(32, 32);
         this.sprite.body.setCollideWorldBounds(true);
@@ -71,6 +72,15 @@ export default class Enemy {
             if(animation.key === 'enemy-attack-right') {
                 this.sprite.play('enemy-idle-right', true);
             }
+
+            if(animation.key === 'enemy-hurt-left') {
+                this.isHurt = false;
+                this.sprite.play('enemy-idle-left', true);
+            }
+            if(animation.key === 'enemy-hurt-right') {
+                this.isHurt = false;
+                this.sprite.play('enemy-idle-right', true);
+            }
         });
 
         // HP Bar
@@ -101,7 +111,7 @@ export default class Enemy {
         const movingRight = this.chaseDirection > 0;
         const facingKey = movingRight ? 'enemy-idle-right' : 'enemy-idle-left';
 
-        if(!this.isAttacking) {
+        if(!this.isAttacking && !this.isHurt) {
             this.sprite.play(facingKey, true);
         }
 
@@ -172,6 +182,16 @@ export default class Enemy {
         if(!this.alive) {
             return;
         }
+
+        this.isHurt = true;
+
+        if(this.isAttacking) {
+            this.isAttacking = false;
+            this.pendingAttackTarget = null;
+        }
+        const facingKey = this.chaseDirection > 0 ? 'enemy-hurt-right' : 'enemy-hurt-left';
+        this.sprite.play(facingKey, true);
+
         this.isAggro = true;
         this.knockback(source);
 
@@ -222,6 +242,14 @@ export default class Enemy {
 
         this.sprite.body.setVelocityX(knobackForce * direction);
         this.sprite.body.setVelocityY(-150);
+
+        this.scene.tweens.add({
+            targets: this.sprite,
+            angle: 30 * direction,
+            duration: 150,
+            yoyo: true,
+            ease: 'Sine.easeOut',
+        });
 
         this.scene.time.delayedCall(this.knockbackDuration, () => {
             this.isKnockedBack = false;
