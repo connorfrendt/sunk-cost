@@ -148,6 +148,7 @@ class GameScene extends Phaser.Scene {
         // Grab boss wall objects
         this.bossRoomWallEntranceObj = this.spawnLayer.objects.find(obj => obj.name === 'boss-room-one-wall-entrance');
         this.bossRoomWallExitObj = this.spawnLayer.objects.find(obj => obj.name === 'boss-room-one-wall-exit');
+        this.bossOneDefeated = false;
 
         // Spawn Braziers
         const brazierPoints = this.spawnLayer.objects.filter(obj => obj.name === 'brazier');
@@ -395,6 +396,7 @@ class GameScene extends Phaser.Scene {
         // Enemy AI
         this.enemies.forEach(enemy => {
             if(!enemy.alive) return;
+            if(!this.player.alive) return;
 
             if(enemy.isAggro || enemy.isBoss) {
                 enemy.moveTowardPlayer(this.player);
@@ -407,6 +409,8 @@ class GameScene extends Phaser.Scene {
     }
     // ------------------ Player Death ------------------- //
     handlePlayerDeath() {
+        this.physics.pause();
+
         this.time.delayedCall(1000, () => {
             this.cameras.main.fadeOut(500, 0, 0, 0);
 
@@ -414,7 +418,13 @@ class GameScene extends Phaser.Scene {
                 this.player.sprite.setPosition(this.currentRespawnPoint.x, this.currentRespawnPoint.y);
                 this.player.heal(this.player.maxHp);
                 this.player.alive = true;
+                this.resetEnemies();
 
+                if(this.bossRoomEntered) {
+                    this.resetBossRoom();
+                }
+
+                this.physics.resume();
                 this.cameras.main.fadeIn(500, 0, 0, 0);
             });
         });
@@ -450,9 +460,18 @@ class GameScene extends Phaser.Scene {
                 this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
                 this.bossRoomEntered = false;
                 this.bossRoomEnemies = null;
+                this.bossOneDefeated = true;
                 // TODO: if time, put in pan/zoomTo transition
             }
         }
+    }
+
+    resetEnemies() {
+        this.enemies.forEach(enemy => {
+            enemy.isAggro = false;
+            enemy.hp = enemy.maxHp;
+            enemy.updateHpBar();
+        });
     }
     
     // ------------------- UPGRADE CHOICES ---------------- //
@@ -691,7 +710,7 @@ class GameScene extends Phaser.Scene {
     BOSS ROOM NEEDS TO BE: 40 tiles wide x 22 tiles high
     */
     enterBossRoom() {
-        if(this.bossRoomEntered) return;
+        if(this.bossRoomEntered || this.bossOneDefeated) return;
         this.bossRoomEntered = true;
 
         this.cameras.main.stopFollow();
@@ -726,6 +745,18 @@ class GameScene extends Phaser.Scene {
         this.bossRoomEnemies.push(boss);
         this.bossRoomExitWallTiles = this.buildWallTiles(this.bossRoomWallExitObj);
         this.sealBossRoom();
+    }
+
+    resetBossRoom() {
+        this.bossRoomEnemies.forEach(enemy => {
+            enemy.destroy();
+            this.enemies = this.enemies.filter(existingEnemy => existingEnemy != enemy);
+        });
+
+        this.bossRoomEnemies = null;
+        this.bossRoomEntered = false;
+        this.bossRoomEntranceWallTiles.forEach(tile => tile.destroy());
+        this.bossRoomExitWallTiles.forEach(tile => tile.destroy());
     }
 
     sealBossRoom() {
