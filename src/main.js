@@ -49,6 +49,10 @@ class GameScene extends Phaser.Scene {
             frameWidth: 16,
             frameHeight: 16,
         });
+        this.load.spritesheet('spikes', '/assets/tilemaps/spikes.png', {
+            frameWidth: 16,
+            frameHeight: 16,
+        });
         this.load.spritesheet('purple-tileset', '/assets/tilemaps/purple-tileset.png', {
             frameWidth: 16,
             frameHeight: 16,
@@ -100,19 +104,46 @@ class GameScene extends Phaser.Scene {
 
         // Create Map
         const map = this.make.tilemap({ key: 'purple-map' });
+        console.log(map.layers.map(l => l.name));
         const purpleTileSet = map.addTilesetImage('purple-tileset', 'purple-tileset');
         this.groundLayer = map.createLayer('Tile Layer 1', purpleTileSet, 0, 0);
         this.groundLayer.setCollisionByProperty({ collides: true });
 
-        
         // Grabs all the object spawns in from Tiled
         this.spawnLayer = map.getObjectLayer('Spawn Layer');
-        
+
         // Spawns Player
         const playerSpawn = this.spawnLayer.objects.find(obj => obj.name === 'player-spawn');
         const playerSpawnCentered = this.getObjectCenter(playerSpawn);
         this.player = new Player(this, playerSpawnCentered.x, playerSpawnCentered.y);
+        // Add physics to player
+        this.physics.add.existing(this.player.sprite);
+        this.player.sprite.body.setSize(25, 32);
+        this.player.sprite.body.setCollideWorldBounds(true);
 
+        const spikesTileset = map.addTilesetImage('spikes', 'spikes');
+        this.spikesLayer = map.createLayer('Spikes Layer', spikesTileset, 0, 0);
+        this.spikesLayer.setCollisionByProperty({ damage: true });
+
+        const debugGraphics = this.add.graphics().setAlpha(0.7);
+        this.spikesLayer.renderDebug(debugGraphics, {
+            tileColor: null,
+            collidingTileColor: new Phaser.Display.Color(255, 0, 0, 150),
+            faceColor: new Phaser.Display.Color(0, 255, 0, 255)
+        });
+
+        this.physics.add.overlap(this.player.sprite, this.spikesLayer, (playerSprite, tile) => {
+            if(tile.index === -1) {
+                return;
+            };
+            this.player.takeDamage(25);
+        });
+        this.spikesLayer.forEachTile(tile => {
+            if(tile.index !== -1) {
+                // console.log('Tile Index: ', tile.index, 'properties: ', tile.properties);
+            }
+        });
+        
         // Respawn Points
         const beginningRespawn = this.spawnLayer.objects.find(obj => obj.name === 'beginning-respawn-point');
         const beginningRespawnCentered = this.getObjectCenter(beginningRespawn);
@@ -233,11 +264,7 @@ class GameScene extends Phaser.Scene {
 
         this.bossSpawnPoint = this.spawnLayer.objects.find(obj => obj.name === 'boss-enemy-spawn');
 
-        // Add physics to player/enemy
-        this.physics.add.existing(this.player.sprite);
         this.enemies.forEach(enemy => this.physics.add.existing(enemy.sprite));
-        this.player.sprite.body.setSize(25, 32);
-        this.player.sprite.body.setCollideWorldBounds(true);
         
         // Camera stuff
         this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
@@ -425,6 +452,7 @@ class GameScene extends Phaser.Scene {
                 }
 
                 this.physics.resume();
+                this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
                 this.cameras.main.fadeIn(500, 0, 0, 0);
             });
         });
@@ -799,7 +827,7 @@ const config = {
         default: 'arcade',
         arcade: {
             gravity: { y: 2000 },
-            debug: false,
+            debug: true,
         }
     },
     scene: [TitleScene, ControlsScene, GameScene],

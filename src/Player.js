@@ -71,6 +71,13 @@ export default class Player {
         }
 
         this.updateHpBar();
+
+        if(this.alive) {
+            this.invulnerable = true;
+            this.scene.time.delayedCall(1000, () => {
+                this.invulnerable = false;
+            })
+        }
     }
 
     heal(amount) {
