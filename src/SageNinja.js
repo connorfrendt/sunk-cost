@@ -1,13 +1,15 @@
 export default class SageNinja {
-    constructor(scene, x, y) {
+    constructor(scene, x, y, wallTiles) {
         this.scene = scene;
 
         this.sprite = scene.add.sprite(x, y + 3, 'sage-ninja');
         this.sprite.setSize(32, 32);
         this.sprite.play('sage-ninja-left');
-
+        
         this.hasBeenTalkedTo = false;
         this.playerNearby = false;
+        
+        this.wallTiles = wallTiles;
     }
 
     tryInteract(vKeyJustPressed, player) {
@@ -33,6 +35,7 @@ export default class SageNinja {
 
     triggerDialogue() {
         this.hasBeenTalkedTo = true;
+        this.scene.currentEncounterWallTiles = this.wallTiles;
         this.scene.showDialogue(this.scene.sageNinjaEncounterCount);
         this.scene.sageNinjaEncounterCount++;
     }

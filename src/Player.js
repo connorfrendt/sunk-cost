@@ -74,9 +74,20 @@ export default class Player {
 
         if(this.alive) {
             this.invulnerable = true;
+
+            this.flickerTween = this.scene.tweens.add({
+                targets: this.sprite,
+                alpha: 0.5,
+                duration: 100,
+                yoyo: true,
+                repeat: -1,
+            });
+
             this.scene.time.delayedCall(1000, () => {
                 this.invulnerable = false;
-            })
+                this.flickerTween.stop();
+                this.sprite.setAlpha(1);
+            });
         }
     }
 
@@ -94,6 +105,7 @@ export default class Player {
     die() {
         this.alive = false;
         this.sprite.body.setVelocity(0, 0);
+        this.scene.spawnBloodSplatter(this.sprite.x, this.sprite.y);
         this.scene.handlePlayerDeath();
     }
 }

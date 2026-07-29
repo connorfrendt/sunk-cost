@@ -104,7 +104,6 @@ class GameScene extends Phaser.Scene {
 
         // Create Map
         const map = this.make.tilemap({ key: 'purple-map' });
-        console.log(map.layers.map(l => l.name));
         const purpleTileSet = map.addTilesetImage('purple-tileset', 'purple-tileset');
         this.groundLayer = map.createLayer('Tile Layer 1', purpleTileSet, 0, 0);
         this.groundLayer.setCollisionByProperty({ collides: true });
@@ -113,7 +112,7 @@ class GameScene extends Phaser.Scene {
         this.spawnLayer = map.getObjectLayer('Spawn Layer');
 
         // Spawns Player
-        const playerSpawn = this.spawnLayer.objects.find(obj => obj.name === 'player-spawn');
+        const playerSpawn = this.getSpawnObject('player-spawn');
         const playerSpawnCentered = this.getObjectCenter(playerSpawn);
         this.player = new Player(this, playerSpawnCentered.x, playerSpawnCentered.y);
         // Add physics to player
@@ -125,34 +124,22 @@ class GameScene extends Phaser.Scene {
         this.spikesLayer = map.createLayer('Spikes Layer', spikesTileset, 0, 0);
         this.spikesLayer.setCollisionByProperty({ damage: true });
 
-        const debugGraphics = this.add.graphics().setAlpha(0.7);
-        this.spikesLayer.renderDebug(debugGraphics, {
-            tileColor: null,
-            collidingTileColor: new Phaser.Display.Color(255, 0, 0, 150),
-            faceColor: new Phaser.Display.Color(0, 255, 0, 255)
-        });
-
         this.physics.add.overlap(this.player.sprite, this.spikesLayer, (playerSprite, tile) => {
             if(tile.index === -1) {
                 return;
             };
-            this.player.takeDamage(25);
-        });
-        this.spikesLayer.forEachTile(tile => {
-            if(tile.index !== -1) {
-                // console.log('Tile Index: ', tile.index, 'properties: ', tile.properties);
-            }
+            this.player.takeDamage(20);
         });
         
         // Respawn Points
-        const beginningRespawn = this.spawnLayer.objects.find(obj => obj.name === 'beginning-respawn-point');
+        const beginningRespawn = this.getSpawnObject('beginning-respawn-point');
         const beginningRespawnCentered = this.getObjectCenter(beginningRespawn);
         this.currentRespawnPoint = {
             x: beginningRespawnCentered.x,
             y: beginningRespawnCentered.y,
         }
 
-        const respawnOneTrigger = this.spawnLayer.objects.find(obj => obj.name === 'respawn-one-trigger');
+        const respawnOneTrigger = this.getSpawnObject('respawn-trigger-one');
         const respawnOneTriggerCentered = this.getObjectCenter(respawnOneTrigger);
         const respawnZoneOne = this.add.rectangle(respawnOneTriggerCentered.x, respawnOneTriggerCentered.y, respawnOneTrigger.width, respawnOneTrigger.height, 0xff0000, 0);
 
@@ -165,21 +152,42 @@ class GameScene extends Phaser.Scene {
             }
         })
 
-        const respawnPointOne = this.spawnLayer.objects.find(obj => obj.name === 'respawn-point-one');
+        const respawnPointOne = this.getSpawnObject('respawn-point-one');
+
+        
+
+        /*
+        // ------------- WALL STUFF ------------ //
+        */
+
+        // Grab boss wall objects
+        this.bossRoomWallEntranceOneObj = this.getRoomObject('boss-room-wall-entrance', 1);
+        this.bossRoomWallExitOneObj = this.getRoomObject('boss-room-wall-exit', 1);
+        this.bossOneDefeated = false;
+        
+        this.currentEncounterWallTiles = null;
+
+        // Corridor Wall Objects
+        this.corridorExitOne = this.getRoomObject('corridor-exit', 1);
+        this.corridorExitWallTilesOne = this.buildWallTiles(this.corridorExitOne);
+        
+        this.corridorWallTilesByName = {
+            one: this.corridorExitWallTilesOne
+        }
+
+        /*------------------------------------------ */
 
         // ----------- SAGE NINJA STUFF ----------- //
         this.sageNinjaPoints = this.spawnLayer.objects.filter(obj => obj.name === 'sage-ninja');
         this.sageNinjas = this.sageNinjaPoints.map(point => {
             const sageNinjaCenter = this.getObjectCenter(point);
-            return new SageNinja(this, sageNinjaCenter.x, sageNinjaCenter.y);
+            const corridorName = point.properties?.find(property => property.name === 'corridor')?.value;
+            const wallTiles = this.corridorWallTilesByName[corridorName];
+            return new SageNinja(this, sageNinjaCenter.x, sageNinjaCenter.y, wallTiles);
         });
 
         this.sageNinjaEncounterCount = 0;
 
-        // Grab boss wall objects
-        this.bossRoomWallEntranceObj = this.spawnLayer.objects.find(obj => obj.name === 'boss-room-one-wall-entrance');
-        this.bossRoomWallExitObj = this.spawnLayer.objects.find(obj => obj.name === 'boss-room-one-wall-exit');
-        this.bossOneDefeated = false;
 
         // Spawn Braziers
         const brazierPoints = this.spawnLayer.objects.filter(obj => obj.name === 'brazier');
@@ -225,10 +233,10 @@ class GameScene extends Phaser.Scene {
         particleGraphics.destroy();
 
         // Boss Wall Trigger to seal boss room once inside
-        this.bossRoomOneWallTrigger = this.spawnLayer.objects.find(obj => obj.name === 'boss-room-one-wall-trigger');
+        this.bossRoomWallTriggerOne = this.getRoomObject('boss-room-wall-trigger', 1);
         
-        const triggerZoneOneCenter = this.getObjectCenter(this.bossRoomOneWallTrigger);
-        const triggerZoneOne = this.add.rectangle(triggerZoneOneCenter.x, triggerZoneOneCenter.y, this.bossRoomOneWallTrigger.width, this.bossRoomOneWallTrigger.height, 0xff0000, 0);
+        const triggerZoneOneCenter = this.getObjectCenter(this.bossRoomWallTriggerOne);
+        const triggerZoneOne = this.add.rectangle(triggerZoneOneCenter.x, triggerZoneOneCenter.y, this.bossRoomWallTriggerOne.width, this.bossRoomWallTriggerOne.height, 0xff0000, 0);
         
         this.physics.add.existing(triggerZoneOne, true);
         this.physics.add.overlap(this.player.sprite, triggerZoneOne, () => {
@@ -236,7 +244,7 @@ class GameScene extends Phaser.Scene {
         });
 
         // Arena center
-        this.bossArenaOne = this.spawnLayer.objects.find(obj => obj.name === 'boss-arena-1');
+        this.bossArenaOne = this.getRoomObject('boss-arena', 1);
         this.bossArenaOneCenter = this.getObjectCenter(this.bossArenaOne);
 
         this.input.mouse.disableContextMenu();
@@ -262,7 +270,7 @@ class GameScene extends Phaser.Scene {
             }
         });
 
-        this.bossSpawnPoint = this.spawnLayer.objects.find(obj => obj.name === 'boss-enemy-spawn');
+        this.bossEnemySpawnOne = this.getRoomObject('boss-enemy-spawn', 1);
 
         this.enemies.forEach(enemy => this.physics.add.existing(enemy.sprite));
         
@@ -630,11 +638,11 @@ class GameScene extends Phaser.Scene {
 
             return { bg, title, desc };
         });
+
+        // destroy corridor
     }
 
     chooseUpgrade(index) {
-        console.log('Chose upgrade index: ', index);
-
         const chosenCard = cardData[index];
 
         // --- UPGRADE CHOICES HERE --- //
@@ -644,6 +652,11 @@ class GameScene extends Phaser.Scene {
 
         if(chosenCard.id === 'ticking') {
             this.player.enableTickingDamage();
+        }
+
+        if(this.currentEncounterWallTiles) {
+            this.destroyWallTiles(this.currentEncounterWallTiles);
+            this.currentEncounterWallTiles = null;
         }
 
         this.upgradeCards.forEach(({ bg, title, desc }) => {
@@ -708,29 +721,77 @@ class GameScene extends Phaser.Scene {
         this.time.delayedCall(1300, () => emitter.destroy());
     }
 
-    // ------------- Spawning things in game -------------- //
+    spawnBloodSplatter(x, y) {
+        const groundY = this.findGroundY(x, y);
+
+        const splatter = this.add.graphics();
+        splatter.fillStyle(0x8b0000, 0.8);
+
+        for(let i = 0; i < 6; i++) {
+            const offsetX = Phaser.Math.Between(-10, 10);
+            const offsetY = Phaser.Math.Between(-6, 0);
+            const radius = Phaser.Math.Between(3, 8);
+            splatter.fillCircle(offsetX, offsetY, radius);
+        }
+
+        splatter.setPosition(x, groundY);
+        splatter.setDepth(1);
+    }
+
+    findGroundY(x, y) {
+        const tileSize = 16;
+        let checkY = y;
+        const maxCheckDistance = 500;
+
+        for(let checked = 0; checked < maxCheckDistance; checked += tileSize) {
+            const tile = this.groundLayer.getTileAtWorldXY(x, checkY);
+
+            if(tile && tile.collides) {
+                return tile.pixelY;
+            }
+
+            checkY += tileSize;
+        }
+
+        return y;
+    }
+
+    // ------------- WALL STUFF -------------- //
     buildWallTiles(wallObj) {
+        const tileIndices = [17, 16, 3, 9, 3, 9, 18, 19];
         const wallCentered = this.getObjectCenter(wallObj);
         const tileSize = 16;
-        const tileCount = 4;
+        const columns = 2;
+        const rows = 4;
         const tiles = [];
 
-        for(let i = 0; i <= tileCount; i++) {
-            const tile = this.add.tileSprite(
-                wallCentered.x,
-                wallObj.y + (i * tileSize),
-                tileSize,
-                tileSize,
-                'purple-tileset',
-                11
-            );
+        const startX = wallCentered.x - tileSize / 2;
+        const startY = wallObj.y + tileSize / 2;
 
-            this.physics.add.existing(tile, true);
-            this.physics.add.collider(this.player.sprite, tile);
-            tiles.push(tile);
+        for(let row = 0; row < rows; row++) {
+            for(let col = 0; col < columns; col++) {
+                const index = row * columns + col;
+
+                const tile = this.add.tileSprite(
+                    startX + (col * tileSize),
+                    startY + (row * tileSize),
+                    tileSize,
+                    tileSize,
+                    'purple-tileset',
+                    tileIndices[index]
+                );
+
+                this.physics.add.existing(tile, true);
+                this.physics.add.collider(this.player.sprite, tile);
+                tiles.push(tile);
+            }
         }
 
         return tiles;
+    }
+
+    destroyWallTiles(wallTiles) {
+        wallTiles.forEach(tile => tile.destroy());
     }
 
     // -------- BOSS ROOM STUFF ---------- //
@@ -757,8 +818,8 @@ class GameScene extends Phaser.Scene {
         this.bossRoomEnemies = [];
 
         const boss = this.spawnEnemy(
-            this.bossSpawnPoint.x,
-            this.bossSpawnPoint.y,
+            this.bossEnemySpawnOne.x,
+            this.bossEnemySpawnOne.y,
             this.scaledEnemyConfig({ 
                 name: 'Boss',
                 hp: 50,
@@ -771,7 +832,6 @@ class GameScene extends Phaser.Scene {
         );
         
         this.bossRoomEnemies.push(boss);
-        this.bossRoomExitWallTiles = this.buildWallTiles(this.bossRoomWallExitObj);
         this.sealBossRoom();
     }
 
@@ -788,10 +848,26 @@ class GameScene extends Phaser.Scene {
     }
 
     sealBossRoom() {
-        this.bossRoomEntranceWallTiles = this.buildWallTiles(this.bossRoomWallEntranceObj);
+        this.bossRoomEntranceWallTiles = this.buildWallTiles(this.bossRoomWallEntranceOneObj);
+        this.bossRoomExitWallTiles = this.buildWallTiles(this.bossRoomWallExitOneObj);
     }
 
     // ------- HELPERS -------- //
+    getSpawnObject(name) {
+        const obj = this.spawnLayer.objects.find(obj => obj.name === name);
+
+        if(!obj) {
+            console.error(`Missing spawn object in Tiled: "${name}"`);
+        }
+        
+        return obj;
+    }
+
+    getRoomObject(baseName, roomNumber) {
+        const roomWord = ['zero', 'one', 'two', 'three', 'four'][roomNumber];
+        return this.getSpawnObject(`${baseName}-${roomWord}`)
+    }
+
     getObjectCenter(obj) {
         return {
             x: obj.x + obj.width / 2,
@@ -827,7 +903,7 @@ const config = {
         default: 'arcade',
         arcade: {
             gravity: { y: 2000 },
-            debug: true,
+            debug: false,
         }
     },
     scene: [TitleScene, ControlsScene, GameScene],
