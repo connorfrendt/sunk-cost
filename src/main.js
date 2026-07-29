@@ -161,19 +161,45 @@ class GameScene extends Phaser.Scene {
         */
 
         // Grab boss wall objects
-        this.bossRoomWallEntranceOneObj = this.getRoomObject('boss-room-wall-entrance', 1);
-        this.bossRoomWallExitOneObj = this.getRoomObject('boss-room-wall-exit', 1);
-        this.bossOneDefeated = false;
+        this.bossDefeated = {};
+        this.bossRoomEntered = {};
+        this.bossRoomEnemies = {};
+        this.bossArenaCenter = {};
+        this.bossRoomEntranceWallTiles = {};
+        this.bossRoomExitWallTiles = {};
+        this.bossRoomWallEntranceObj = {};
+        this.bossRoomWallExitObj = {};
+        this.bossEnemySpawn = {};
+        this.bossRoomWallTrigger = {};
+        this.corridorExit = {};
+        this.corridorExitWallTiles = {};
+        this.corridorWallTilesByName = {};
+
+        const roomWords = ['zero', 'one', 'two', 'three', 'four'];
+
+        [1, 2].forEach(roomNumber => {
+            this.bossRoomWallEntranceObj[roomNumber] = this.getRoomObject('boss-room-wall-entrance', roomNumber);
+            this.bossRoomWallExitObj[roomNumber] = this.getRoomObject('boss-room-wall-exit', roomNumber);
+            this.bossArenaCenter[roomNumber] = this.getObjectCenter(this.getRoomObject('boss-arena', roomNumber));
+            this.bossEnemySpawn[roomNumber] = this.getRoomObject('boss-enemy-spawn', roomNumber);
+            this.bossDefeated[roomNumber] = false;
+            this.bossRoomEntered[roomNumber] = false;
+
+            this.bossRoomWallTrigger[roomNumber] = this.getRoomObject('boss-room-wall-trigger', roomNumber);
+            const triggerCenter = this.getObjectCenter(this.bossRoomWallTrigger[roomNumber]);
+            const triggerZone = this.add.rectangle(triggerCenter.x, triggerCenter.y, this.bossRoomWallTrigger[roomNumber].width, this.bossRoomWallTrigger[roomNumber].height, 0xff0000, 0);
+        
+            this.physics.add.existing(triggerZone, true);
+            this.physics.add.overlap(this.player.sprite, triggerZone, () => {
+                this.enterBossRoom(roomNumber);
+            });
+
+            this.corridorExit[roomNumber] = this.getRoomObject('corridor-exit', roomNumber);
+            this.corridorExitWallTiles[roomNumber] = this.buildWallTiles(this.corridorExit[roomNumber]);
+            this.corridorWallTilesByName[roomWords[roomNumber]] = this.corridorExitWallTiles[roomNumber];
+        });
         
         this.currentEncounterWallTiles = null;
-
-        // Corridor Wall Objects
-        this.corridorExitOne = this.getRoomObject('corridor-exit', 1);
-        this.corridorExitWallTilesOne = this.buildWallTiles(this.corridorExitOne);
-        
-        this.corridorWallTilesByName = {
-            one: this.corridorExitWallTilesOne
-        }
 
         /*------------------------------------------ */
 
@@ -187,7 +213,6 @@ class GameScene extends Phaser.Scene {
         });
 
         this.sageNinjaEncounterCount = 0;
-
 
         // Spawn Braziers
         const brazierPoints = this.spawnLayer.objects.filter(obj => obj.name === 'brazier');
@@ -232,21 +257,6 @@ class GameScene extends Phaser.Scene {
         particleGraphics.generateTexture('light-particle', 8, 8);
         particleGraphics.destroy();
 
-        // Boss Wall Trigger to seal boss room once inside
-        this.bossRoomWallTriggerOne = this.getRoomObject('boss-room-wall-trigger', 1);
-        
-        const triggerZoneOneCenter = this.getObjectCenter(this.bossRoomWallTriggerOne);
-        const triggerZoneOne = this.add.rectangle(triggerZoneOneCenter.x, triggerZoneOneCenter.y, this.bossRoomWallTriggerOne.width, this.bossRoomWallTriggerOne.height, 0xff0000, 0);
-        
-        this.physics.add.existing(triggerZoneOne, true);
-        this.physics.add.overlap(this.player.sprite, triggerZoneOne, () => {
-            this.enterBossRoom();
-        });
-
-        // Arena center
-        this.bossArenaOne = this.getRoomObject('boss-arena', 1);
-        this.bossArenaOneCenter = this.getObjectCenter(this.bossArenaOne);
-
         this.input.mouse.disableContextMenu();
 
         // this.zoomKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
@@ -269,8 +279,6 @@ class GameScene extends Phaser.Scene {
                 }
             }
         });
-
-        this.bossEnemySpawnOne = this.getRoomObject('boss-enemy-spawn', 1);
 
         this.enemies.forEach(enemy => this.physics.add.existing(enemy.sprite));
         
@@ -455,8 +463,8 @@ class GameScene extends Phaser.Scene {
                 this.player.alive = true;
                 this.resetEnemies();
 
-                if(this.bossRoomEntered) {
-                    this.resetBossRoom();
+                if(this.currentActiveBossRoom) {
+                    this.resetBossRoom(this.currentActiveBossRoom);
                 }
 
                 this.physics.resume();
@@ -488,15 +496,16 @@ class GameScene extends Phaser.Scene {
     removeEnemyFromArray(enemyToRemove) {
         this.enemies = this.enemies.filter(enemy => enemy !== enemyToRemove);
 
-        if(this.bossRoomEntered && this.bossRoomEnemies) {
-            this.bossRoomEnemies = this.bossRoomEnemies.filter(enemy => enemy !== enemyToRemove);
+        const roomNumber = enemyToRemove.bossRoomNumber;
+        if(roomNumber && this.bossRoomEnemies[roomNumber]) {
+            this.bossRoomEnemies[roomNumber] = this.bossRoomEnemies[roomNumber].filter(enemy => enemy !== enemyToRemove);
         
-            if(this.bossRoomEnemies.length === 0) {
-                this.bossRoomExitWallTiles.forEach(tile => tile.destroy());
+            if(this.bossRoomEnemies[roomNumber].length === 0) {
+                this.bossRoomExitWallTiles[roomNumber].forEach(tile => tile.destroy());
                 this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
-                this.bossRoomEntered = false;
-                this.bossRoomEnemies = null;
-                this.bossOneDefeated = true;
+                this.bossRoomEntered[roomNumber] = false;
+                this.bossRoomEnemies[roomNumber] = null;
+                this.bossDefeated[roomNumber] = true;
                 // TODO: if time, put in pan/zoomTo transition
             }
         }
@@ -798,28 +807,24 @@ class GameScene extends Phaser.Scene {
     /*
     BOSS ROOM NEEDS TO BE: 40 tiles wide x 22 tiles high
     */
-    enterBossRoom() {
-        if(this.bossRoomEntered || this.bossOneDefeated) return;
-        this.bossRoomEntered = true;
+    enterBossRoom(roomNumber) {
+        this.currentActiveBossRoom = roomNumber;
+
+        if(this.bossRoomEntered[roomNumber] || this.bossDefeated[roomNumber]) return;
+        this.bossRoomEntered[roomNumber] = true;
 
         this.cameras.main.stopFollow();
         
-        const arenaOneCenterX = this.bossArenaOneCenter.x;
-        const arenaOneCenterY = this.bossArenaOneCenter.y;
-
-        this.cameras.main.pan(arenaOneCenterX, arenaOneCenterY, 600, 'Sine.easeInOut');
-        // this.cameras.main.pan(arenaCenterX, arenaCenterY, 600, 'Sine.easeInOut', false, (camera, progress) => {
-        //     if(progress === 1) {
-        //         // spawn enemies, seal wall - runs once pan finishes
-        //     }
-        // });
+        const arenaCenter = this.bossArenaCenter[roomNumber];
+        this.cameras.main.pan(arenaCenter.x, arenaCenter.y, 600, 'Sine.easeInOut');
         this.cameras.main.zoomTo(1, 600, 'Sine.easeInOut');
 
-        this.bossRoomEnemies = [];
+        this.bossRoomEnemies[roomNumber] = [];
 
+        const spawnPoint = this.bossEnemySpawn[roomNumber];
         const boss = this.spawnEnemy(
-            this.bossEnemySpawnOne.x,
-            this.bossEnemySpawnOne.y,
+            spawnPoint.x,
+            spawnPoint.y,
             this.scaledEnemyConfig({ 
                 name: 'Boss',
                 hp: 50,
@@ -830,26 +835,27 @@ class GameScene extends Phaser.Scene {
                 scale: 2,
             }),
         );
+        boss.bossRoomNumber = roomNumber;
         
-        this.bossRoomEnemies.push(boss);
-        this.sealBossRoom();
+        this.bossRoomEnemies[roomNumber].push(boss);
+        this.sealBossRoom(roomNumber);
     }
 
-    resetBossRoom() {
-        this.bossRoomEnemies.forEach(enemy => {
+    resetBossRoom(roomNumber) {
+        this.bossRoomEnemies[roomNumber].forEach(enemy => {
             enemy.destroy();
             this.enemies = this.enemies.filter(existingEnemy => existingEnemy != enemy);
         });
 
-        this.bossRoomEnemies = null;
-        this.bossRoomEntered = false;
-        this.bossRoomEntranceWallTiles.forEach(tile => tile.destroy());
-        this.bossRoomExitWallTiles.forEach(tile => tile.destroy());
+        this.bossRoomEnemies[roomNumber] = null;
+        this.bossRoomEntered[roomNumber] = false;
+        this.bossRoomEntranceWallTiles[roomNumber].forEach(tile => tile.destroy());
+        this.bossRoomExitWallTiles[roomNumber].forEach(tile => tile.destroy());
     }
 
-    sealBossRoom() {
-        this.bossRoomEntranceWallTiles = this.buildWallTiles(this.bossRoomWallEntranceOneObj);
-        this.bossRoomExitWallTiles = this.buildWallTiles(this.bossRoomWallExitOneObj);
+    sealBossRoom(roomNumber) {
+        this.bossRoomEntranceWallTiles[roomNumber] = this.buildWallTiles(this.bossRoomWallEntranceObj[roomNumber]);
+        this.bossRoomExitWallTiles[roomNumber] = this.buildWallTiles(this.bossRoomWallExitObj[roomNumber]);
     }
 
     // ------- HELPERS -------- //
