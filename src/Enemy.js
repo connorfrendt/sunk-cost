@@ -15,16 +15,18 @@ export default class Enemy {
         this.knockbackDuration = 150; // ms
         this.scale = config.scale || 1;
         this.isHurt = false;
+        this.aggroOnSight = config.aggroOnSight || false;
 
         // Attacking
         this.isAttacking = false;
         this.attackCooldown = 0;
-        this.attackInterval = 1000; // ms between attacks
+        this.attackInterval = config.attackInterval || 1000; // ms between attacks
         this.attackDamage = config.attackDamage || 10;
 
-        this.chaseRange = 600; // How far away the enemy notices the player
+        this.chaseRange = config.chaseRange || 180; // How far away the enemy notices the player
+        this.giveUpRange = config.giveUpRange || 200;
         this.stopRange = 35 * this.scale; // Don't walk into the center of the player, stand at melee range
-        this.speed = 80; // pixels per second
+        this.speed = config.speed || 80; // pixels per second
         this.jumpVelocity = -750;
         this.horizontalDeadzone = 10 * this.scale;
 
@@ -102,6 +104,12 @@ export default class Enemy {
             player.sprite.x, player.sprite.y
         );
 
+        if(distance >= this.giveUpRange) {
+            this.isAggro = false;
+            this.sprite.body.setVelocityX(0);
+            return;
+        }
+
         const xDifference = player.sprite.x - this.sprite.x;
 
         if(Math.abs(xDifference) > this.horizontalDeadzone) {
@@ -115,7 +123,7 @@ export default class Enemy {
             this.sprite.play(facingKey, true);
         }
 
-        if(distance < this.chaseRange && distance > this.stopRange) {
+        if(distance < this.giveUpRange && distance > this.stopRange) {
             this.sprite.body.setVelocityX(this.speed * this.chaseDirection);
 
             const blockedInMoveDirection =
@@ -135,6 +143,18 @@ export default class Enemy {
     patrol() {
         if(!this.alive || this.isAggro || this.isKnockedBack) {
             return;
+        }
+
+        if(this.aggroOnSight) {
+            const distance = Phaser.Math.Distance.Between(
+                this.sprite.x, this.sprite.y,
+                this.scene.player.sprite.x, this.scene.player.sprite.y
+            );
+
+            if(distance <= this.chaseRange) {
+                this.isAggro = true;
+                return;
+            }
         }
 
         this.sprite.body.setVelocityX(this.patrolSpeed * this.patrolDirection);

@@ -139,23 +139,6 @@ class GameScene extends Phaser.Scene {
             y: beginningRespawnCentered.y,
         }
 
-        const respawnOneTrigger = this.getSpawnObject('respawn-trigger-one');
-        const respawnOneTriggerCentered = this.getObjectCenter(respawnOneTrigger);
-        const respawnZoneOne = this.add.rectangle(respawnOneTriggerCentered.x, respawnOneTriggerCentered.y, respawnOneTrigger.width, respawnOneTrigger.height, 0xff0000, 0);
-
-        this.physics.add.existing(respawnZoneOne, true);
-        this.physics.add.overlap(this.player.sprite, respawnZoneOne, () => {
-            const respawnPointOneCentered = this.getObjectCenter(respawnPointOne);
-            this.currentRespawnPoint = {
-                x: respawnPointOneCentered.x,
-                y: respawnPointOneCentered.y,
-            }
-        })
-
-        const respawnPointOne = this.getSpawnObject('respawn-point-one');
-
-        
-
         /*
         // ------------- WALL STUFF ------------ //
         */
@@ -171,9 +154,13 @@ class GameScene extends Phaser.Scene {
         this.bossRoomWallExitObj = {};
         this.bossEnemySpawn = {};
         this.bossRoomWallTrigger = {};
+
         this.corridorExit = {};
         this.corridorExitWallTiles = {};
         this.corridorWallTilesByName = {};
+
+        this.respawnTrigger = {};
+        this.respawnPoint = {};
 
         const roomWords = ['zero', 'one', 'two', 'three', 'four'];
 
@@ -186,8 +173,8 @@ class GameScene extends Phaser.Scene {
             this.bossRoomEntered[roomNumber] = false;
 
             this.bossRoomWallTrigger[roomNumber] = this.getRoomObject('boss-room-wall-trigger', roomNumber);
-            const triggerCenter = this.getObjectCenter(this.bossRoomWallTrigger[roomNumber]);
-            const triggerZone = this.add.rectangle(triggerCenter.x, triggerCenter.y, this.bossRoomWallTrigger[roomNumber].width, this.bossRoomWallTrigger[roomNumber].height, 0xff0000, 0);
+            const bossRoomWallTriggerCenter = this.getObjectCenter(this.bossRoomWallTrigger[roomNumber]);
+            const triggerZone = this.add.rectangle(bossRoomWallTriggerCenter.x, bossRoomWallTriggerCenter.y, this.bossRoomWallTrigger[roomNumber].width, this.bossRoomWallTrigger[roomNumber].height, 0xff0000, 0);
         
             this.physics.add.existing(triggerZone, true);
             this.physics.add.overlap(this.player.sprite, triggerZone, () => {
@@ -197,6 +184,21 @@ class GameScene extends Phaser.Scene {
             this.corridorExit[roomNumber] = this.getRoomObject('corridor-exit', roomNumber);
             this.corridorExitWallTiles[roomNumber] = this.buildWallTiles(this.corridorExit[roomNumber]);
             this.corridorWallTilesByName[roomWords[roomNumber]] = this.corridorExitWallTiles[roomNumber];
+
+            this.respawnTrigger[roomNumber] = this.getRoomObject('respawn-trigger', roomNumber);
+            this.respawnPoint[roomNumber] = this.getRoomObject('respawn-point', roomNumber);
+
+            const respawnTriggerCenter = this.getObjectCenter(this.respawnTrigger[roomNumber]);
+            const respawnZone = this.add.rectangle(respawnTriggerCenter.x, respawnTriggerCenter.y, this.respawnTrigger[roomNumber].width, this.respawnTrigger[roomNumber].height, 0xff0000, 0);
+            
+            this.physics.add.existing(respawnZone, true);
+            this.physics.add.overlap(this.player.sprite, respawnZone, () => {
+                const respawnPointCentered = this.getObjectCenter(this.respawnPoint[roomNumber]);
+                this.currentRespawnPoint = {
+                    x: respawnPointCentered.x,
+                    y: respawnPointCentered.y,
+                }
+            });
         });
         
         this.currentEncounterWallTiles = null;
@@ -243,12 +245,29 @@ class GameScene extends Phaser.Scene {
         this.enemies = [];
         const enemySpawnPoints = this.spawnLayer.objects.filter(obj => obj.name === 'enemy-spawn');
         enemySpawnPoints.forEach(point => {
+            const aggroOnSight = point.properties?.find(property => property.name === 'aggroOnSight')?.value || false;
+            const giveUpRange = point.properties?.find(property => property.name === 'giveUpRange')?.value || false;
+
             this.spawnEnemy(point.x + point.width / 2, point.y + point.height / 2, this.scaledEnemyConfig({
                 name: 'Enemeanie',
                 hp: 30,
                 maxHp: 30,
+                aggroOnSight,
+                giveUpRange,
             }));
         });
+
+        this.interactPrompt = this.add.text(0, 0, 'V - Interact', {
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            color: '#ffffff',
+            resolution: 3,
+        })
+            .setOrigin(0.5)
+            .setDepth(60)
+            .setAlpha(0);
+
+        this.playerNearInteractable = false;
 
         // Door Light
         const particleGraphics = this.make.graphics();
@@ -332,13 +351,32 @@ class GameScene extends Phaser.Scene {
             }
         });
 
-        this.chests.forEach(chest => {
-            return chest.playerNearby = false;
-        });
+        // this.chests.forEach(chest => {
+        //     return chest.playerNearby = false;
+        // });
 
         this.sageNinjas.forEach(ninja => {
             ninja.tryInteract(vKeyJustPressed, this.player);
         });
+
+        const nearbyChest = this.chests.find(chest => chest.playerNearby && !chest.isOpen);
+        const nearbySageNinja = this.sageNinjas.find(ninja => ninja.playerNearby && !ninja.hasBeenTalkedTo);
+        const nearbyInteractable = nearbyChest || nearbySageNinja;
+        
+        if(!!nearbyInteractable !== this.playerNearInteractable) {
+            this.playerNearInteractable = !!nearbyInteractable;
+
+            this.tweens.add({
+                targets: this.interactPrompt,
+                alpha: this.playerNearInteractable ? 1 : 0,
+                duration: 200,
+            });
+        }
+
+        if(nearbyInteractable) {
+            const targetSprite = nearbyChest ? nearbyChest.sprite : nearbySageNinja.sprite;
+            this.interactPrompt.setPosition(targetSprite.x, targetSprite.y - 20);
+        }
 
         // Enemy Health Bar/Visuals
         this.enemies.forEach(enemy => {
@@ -506,6 +544,7 @@ class GameScene extends Phaser.Scene {
                 this.bossRoomEntered[roomNumber] = false;
                 this.bossRoomEnemies[roomNumber] = null;
                 this.bossDefeated[roomNumber] = true;
+                this.currentActiveBossRoom = null;
                 // TODO: if time, put in pan/zoomTo transition
             }
         }
@@ -808,10 +847,13 @@ class GameScene extends Phaser.Scene {
     BOSS ROOM NEEDS TO BE: 40 tiles wide x 22 tiles high
     */
     enterBossRoom(roomNumber) {
-        this.currentActiveBossRoom = roomNumber;
+        
+        if(this.bossRoomEntered[roomNumber] || this.bossDefeated[roomNumber]) {
+            return;
+        }
 
-        if(this.bossRoomEntered[roomNumber] || this.bossDefeated[roomNumber]) return;
         this.bossRoomEntered[roomNumber] = true;
+        this.currentActiveBossRoom = roomNumber;
 
         this.cameras.main.stopFollow();
         
@@ -832,6 +874,8 @@ class GameScene extends Phaser.Scene {
                 isBoss: true,
                 attackDamage: 30,
                 attackInterval: 500,
+                chaseRange: 1000,
+                giveUpRange: 1000,
                 scale: 2,
             }),
         );
@@ -851,6 +895,7 @@ class GameScene extends Phaser.Scene {
         this.bossRoomEntered[roomNumber] = false;
         this.bossRoomEntranceWallTiles[roomNumber].forEach(tile => tile.destroy());
         this.bossRoomExitWallTiles[roomNumber].forEach(tile => tile.destroy());
+        this.currentActiveBossRoom = null;
     }
 
     sealBossRoom(roomNumber) {
@@ -886,7 +931,9 @@ class GameScene extends Phaser.Scene {
             ...baseConfig,
             hp: Math.round(baseConfig.hp * this.roomDifficulty),
             maxHp: Math.round(baseConfig.maxHp * this.roomDifficulty),
-            attackDamage: Math.round((baseConfig.attackDamage || 10) * this.roomDifficulty)
+            attackDamage: Math.round((baseConfig.attackDamage || 10) * this.roomDifficulty),
+            speed: Math.round((baseConfig || 80) * this.roomDifficulty),
+            attackInterval: Math.round((baseConfig.attackInterval || 1000) / this.roomDifficulty),
         }
     }
 }
