@@ -4,7 +4,11 @@ export const TICK_DAMAGE_AMOUNT = 5;
 export const TICK_INTERVAL_MS = 1000;
 export const TICK_COUNT = 5;
 
-export const LIFE_DRAIN_PERCENT = 0.25;
+export const LIFE_DRAIN_PERCENT = 0.10;
+
+export const THORNS_PERCENT = 0.5;
+
+export const GLASS_CANNON
 
 export const cardData = [
     {
@@ -21,16 +25,16 @@ export const cardData = [
         applyTo: (target) => target.enableTickingDamage(),
     },
     {
-        id: 'dash',
-        title: 'DASH',
-        desc: 'DASH PH',
+        id: 'glasscannon',
+        title: 'GLASS CANNON',
+        desc: 'Deal twice the damage, but ',
         applyTo: (target) => console.log(target),
     },
     {
-        id: 'fireball',
-        title: 'FIREBALL',
-        desc: 'FIREBALL PH',
-        applyTo: (target) => console.log(target),
+        id: 'shuriken',
+        title: 'SHURIKEN',
+        desc: 'Throw a shuriken at your foes (Press "C")',
+        applyTo: (target) => target.enableShuriken(),
     },
     {
         id: 'lifedrain',
@@ -41,7 +45,7 @@ export const cardData = [
     {
         id: 'thorns',
         title: 'THORNS',
-        desc: 'Enemies that strike you take damage in return',
-        applyTo: (target) => console.log(target),
+        desc: `Reflect ${THORNS_PERCENT * 100}% of damage taken back at attackers`,
+        applyTo: (target) => target.enableThorns(THORNS_PERCENT),
     },
 ];

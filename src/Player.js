@@ -46,6 +46,12 @@ export default class Player {
         this.hasTickingDamage = false;
         this.hasLifeDrain = false;
         this.lifeDrainPercent = 0;
+        this.hasThorns = false;
+        this.thornsPercent = 0;
+        this.hasShuriken = false;
+        this.shurikenDamageMultiplier = 0.75;
+        this.shurikenSpeed = 400;
+        this.shurikenMaxRange = 150;
     }
 
     addBonusDamage(amount) {
@@ -83,7 +89,7 @@ export default class Player {
         })
     }
 
-    takeDamage(amount) {
+    takeDamage(amount, source, isThornsDamage = false) {
         if(!this.alive) {
             return;
         }
@@ -92,14 +98,19 @@ export default class Player {
         }
         
         this.hp -= amount;
-        this.scene.cameras.main.shake(150, 0.005);  
-
+        this.updateHpBar();
+        
         if(this.hp <= 0) {
             this.hp = 0;
             this.die();
+            return;
+        }
+        
+        if(isThornsDamage) {
+            return;
         }
 
-        this.updateHpBar();
+        this.scene.cameras.main.shake(150, 0.005);  
 
         if(this.alive) {
             this.invulnerable = true;
@@ -118,11 +129,26 @@ export default class Player {
                 this.sprite.setAlpha(1);
             });
         }
+
+        if(this.hasThorns && source && !isThornsDamage) {
+            this.scene.time.delayedCall(0, () => {
+                source.takeDamage(Math.round(amount * this.thornsPercent), this.sprite, true);
+            });
+        }
     }
 
     enableLifeDrain(percent) {
         this.hasLifeDrain = true;
         this.lifeDrainPercent = percent;
+    }
+
+    enableThorns(percent) {
+        this.hasThorns = true;
+        this.thornsPercent = percent;
+    }
+
+    enableShuriken() {
+        this.hasShuriken = true;
     }
 
     heal(amount) {
@@ -139,6 +165,8 @@ export default class Player {
     die() {
         this.alive = false;
         this.sprite.body.setVelocity(0, 0);
+        this.sprite.anims.stop();
+        this.sprite.play(this.lastDirectionFaced === 'left' ? 'ninja-idle-left' : 'ninja-idle-right', true);
         this.scene.spawnBloodSplatter(this.sprite.x, this.sprite.y);
         this.scene.handlePlayerDeath();
     }

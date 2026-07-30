@@ -20,6 +20,13 @@ export default class Enemy {
         this.aggroOnSight = config.aggroOnSight || false;
         this.hasLifeDrain = false;
         this.lifeDrainPercent = 0;
+        this.hasThorns = false;
+        this.thornsPercent = 0;
+        this.hasShuriken = false;
+        this.shurikenDamageMultiplier = 0.75;
+        this.shurikenSpeed = 400;
+        this.shurikenMaxRange = 150;
+        this.shurikenAttackRange = 250;
 
         // Attacking
         this.isAttacking = false;
@@ -49,23 +56,31 @@ export default class Enemy {
             const isImpactFrame = frame.index === 4;
 
             if(isAttackAnim && isImpactFrame && this.pendingAttackTarget) {
-                const distance = Phaser.Math.Distance.Between(
-                    this.sprite.x, this.sprite.y,
-                    this.pendingAttackTarget.sprite.x, this.pendingAttackTarget.sprite.y
-                );
-
-                if(distance <= this.stopRange) {
-                    const totalDamage = this.attackDamage + (this.bonusDamage || 0);
-                    this.pendingAttackTarget.takeDamage(totalDamage);
-
-                    if(this.hasTickingDamage) {
-                        this.pendingAttackTarget.applyTickingDamage(TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS, TICK_COUNT);
+                    const distance = Phaser.Math.Distance.Between(
+                        this.sprite.x, this.sprite.y,
+                        this.pendingAttackTarget.sprite.x, this.pendingAttackTarget.sprite.y
+                    );
+                    
+                    const useShuriken = this.hasShuriken && this.isBoss && distance > this.stopRange;
+                    if(useShuriken) {
+                        const direction = this.sprite.x < this.pendingAttackTarget.sprite.x ? 1 : -1;
+                        this.scene.spawnShuriken(this, direction);
                     }
 
-                    if(this.hasLifeDrain) {
-                        this.heal(Math.round(totalDamage * this.lifeDrainPercent));
+                    else if(distance <= this.stopRange) {
+                        const totalDamage = this.attackDamage + (this.bonusDamage || 0);
+                        this.pendingAttackTarget.takeDamage(totalDamage, this);
+    
+                        if(this.hasTickingDamage) {
+                            this.pendingAttackTarget.applyTickingDamage(TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS, TICK_COUNT);
+                        }
+    
+                        if(this.hasLifeDrain) {
+                            this.heal(Math.round(totalDamage * this.lifeDrainPercent));
+                        }
                     }
-                }
+                // }
+
 
                 this.pendingAttackTarget = null;
             }
@@ -193,8 +208,10 @@ export default class Enemy {
             this.sprite.x, this.sprite.y,
             player.sprite.x, player.sprite.y
         );
+
+        const triggerRange = this.hasShuriken ? this.shurikenAttackRange : this.stopRange;
         
-        if(distance <= this.stopRange) {
+        if(distance <= triggerRange) {
             this.attackCooldown -= delta;
             
             if(this.attackCooldown <= 0 && !this.isAttacking) {
@@ -215,24 +232,10 @@ export default class Enemy {
         this.bonusDamage = (this.bonusDamage || 0) + amount;
     }
 
-    takeDamage(amount, source) {
+    takeDamage(amount, source, isThornsDamage = false) {
         if(!this.alive) {
             return;
         }
-
-        this.isHurt = true;
-
-        if(this.isAttacking) {
-            this.isAttacking = false;
-            this.pendingAttackTarget = null;
-        }
-        const facingKey = this.chaseDirection > 0 ? 'enemy-hurt-right' : 'enemy-hurt-left';
-        this.sprite.play(facingKey, true);
-
-        this.isAggro = true;
-        this.knockback(source);
-
-        // this.scene.cameras.main.shake(150, 0.003);
 
         this.hp -= amount;
         this.updateHpBar();
@@ -241,6 +244,34 @@ export default class Enemy {
             this.die();
             return;
         }
+
+        if(isThornsDamage) {
+            return;
+        }
+
+        if(!this.isBoss) {
+            this.isHurt = true;
+
+            if(this.isAttacking) {
+                this.isAttacking = false;
+                this.pendingAttackTarget = null;
+            }
+
+            const facingKey = this.chaseDirection > 0 ? 'enemy-hurt-right' : 'enemy-hurt-left';
+            this.sprite.play(facingKey, true);
+        }
+
+
+        this.isAggro = true;
+        this.knockback(source);
+
+        if(this.hasThorns && source) {
+            this.scene.time.delayedCall(0, () => {
+                this.scene.player.takeDamage(Math.round(amount * this.thornsPercent), this.sprite, true);
+            });
+        }
+
+
     }
 
     enableTickingDamage() {
@@ -276,6 +307,15 @@ export default class Enemy {
         this.lifeDrainPercent = percent;
     }
 
+    enableThorns(percent) {
+        this.hasThorns = true;
+        this.thornsPercent = percent;
+    }
+
+    enableShuriken() {
+        this.hasShuriken = true;
+    }
+
     heal(amount) {
         this.hp = Math.min(this.hp + amount, this.maxHp);
         this.updateHpBar();
@@ -286,14 +326,14 @@ export default class Enemy {
             return;
         }
 
-        this.isKnockedBack = true;
+        if(this.isBoss) {
+            return;
+        }
 
+        this.isKnockedBack = true;
         const direction = this.sprite.x < source.x ? -1 : 1; // push away from hit source
         const knobackForce = 200;
-
-        this.sprite.body.setVelocityX(knobackForce * direction);
-        this.sprite.body.setVelocityY(-150);
-
+        
         this.scene.tweens.add({
             targets: this.sprite,
             angle: 30 * direction,
@@ -301,6 +341,9 @@ export default class Enemy {
             yoyo: true,
             ease: 'Sine.easeOut',
         });
+
+        this.sprite.body.setVelocityX(knobackForce * direction);
+        this.sprite.body.setVelocityY(-150);
 
         this.scene.time.delayedCall(this.knockbackDuration, () => {
             this.isKnockedBack = false;
@@ -319,10 +362,6 @@ export default class Enemy {
         this.hpBar.setVisible(false);
         this.hpBarBg.setVisible(false);
         this.scene.removeEnemyFromArray(this);
-        
-        // if(this.isBoss) {
-        //     this.scene.showUpgradeChoice();
-        // }
     }
 
     destroy() {

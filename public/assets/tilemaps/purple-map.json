@@ -1477,18 +1477,6 @@
                  "y":2551.5
                 }, 
                 {
-                 "height":33,
-                 "id":99,
-                 "name":"player-spawn",
-                 "opacity":1,
-                 "rotation":0,
-                 "type":"",
-                 "visible":true,
-                 "width":33,
-                 "x":72,
-                 "y":3149.75
-                }, 
-                {
                  "height":15.6364,
                  "id":100,
                  "name":"brazier",
@@ -1535,6 +1523,18 @@
                  "width":15.8182,
                  "x":3376.1561173913,
                  "y":1328.20353913044
+                }, 
+                {
+                 "height":33,
+                 "id":109,
+                 "name":"player-spawn",
+                 "opacity":1,
+                 "rotation":0,
+                 "type":"",
+                 "visible":true,
+                 "width":33,
+                 "x":1292.5,
+                 "y":2284
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -1543,7 +1543,7 @@
          "y":0
         }],
  "nextlayerid":4,
- "nextobjectid":104,
+ "nextobjectid":110,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",

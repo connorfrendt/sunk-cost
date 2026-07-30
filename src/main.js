@@ -53,6 +53,7 @@ class GameScene extends Phaser.Scene {
             frameWidth: 16,
             frameHeight: 16,
         });
+        this.load.image('shuriken', '/assets/projectiles/shuriken.png');
         this.load.spritesheet('purple-tileset', '/assets/tilemaps/purple-tileset.png', {
             frameWidth: 16,
             frameHeight: 16,
@@ -70,6 +71,8 @@ class GameScene extends Phaser.Scene {
         
         this.anims.create({ key: 'ninja-attack-left', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 0, end: 2 }), frameRate: 12, repeat: 0 });
         this.anims.create({ key: 'ninja-attack-right', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 3, end: 5 }), frameRate: 12, repeat: 0 });
+        this.anims.create({ key: 'ninja-throw-left', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 6, end: 8 }), frameRate: 18, repeat: 0 });
+        this.anims.create({ key: 'ninja-throw-right', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 9, end: 11 }), frameRate: 18, repeat: 0 });
         
         this.anims.create({ key: 'enemy-idle-left', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 6, end: 11 }), frameRate: 3, repeat: -1 });
         this.anims.create({ key: 'enemy-idle-right', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 0, end: 5 }), frameRate: 3, repeat: -1 });
@@ -82,7 +85,7 @@ class GameScene extends Phaser.Scene {
             frames: [
                 { key: 'enemy-attack', frame: 0, duration: 50 },
                 { key: 'enemy-attack', frame: 1, duration: 50 },
-                { key: 'enemy-attack', frame: 2, duration: 500 },
+                { key: 'enemy-attack', frame: 2, duration: 500 }, // 500, the rest 50
                 { key: 'enemy-attack', frame: 3, duration: 50 },
                 { key: 'enemy-attack', frame: 4, duration: 50 },
             ],
@@ -93,7 +96,7 @@ class GameScene extends Phaser.Scene {
             frames: [
                 { key: 'enemy-attack', frame: 5, duration: 50 },
                 { key: 'enemy-attack', frame: 6, duration: 50 },
-                { key: 'enemy-attack', frame: 7, duration: 500 },
+                { key: 'enemy-attack', frame: 7, duration: 500 }, // 500, the rest 50
                 { key: 'enemy-attack', frame: 8, duration: 50 },
                 { key: 'enemy-attack', frame: 9, duration: 50 },
             ],
@@ -290,9 +293,6 @@ class GameScene extends Phaser.Scene {
 
         this.input.mouse.disableContextMenu();
 
-        // this.zoomKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
-        // this.debugZoomedOut = false;
-
         this.physics.add.collider(this.player.sprite, this.groundLayer);
 
         this.player.sprite.play('ninja-idle-right');
@@ -300,14 +300,25 @@ class GameScene extends Phaser.Scene {
         this.player.sprite.on('animationcomplete', (animation) => {
             if(this.player.alive) {
                 
-                if(animation.key === 'ninja-attack-left') {
+                if(animation.key === 'ninja-attack-left' || animation.key === 'ninja-throw-left') {
                     this.player.isAttacking = false;
                     this.player.sprite.play('ninja-idle-left', true);
                 }
-                if(animation.key === 'ninja-attack-right') {
+                if(animation.key === 'ninja-attack-right' || animation.key === 'ninja-throw-right') {
                     this.player.isAttacking = false;
                     this.player.sprite.play('ninja-idle-right', true);
                 }
+            }
+        });
+
+        this.player.sprite.on('animationupdate', (animation, frame) => {
+            const isThrowAnim = animation.key === 'ninja-throw-left' || animation.key === 'ninja-throw-right';
+            const isReleaseFrame = frame.index === 2;
+
+            if(isThrowAnim && isReleaseFrame && this.player.pendingShurikenThrow) {
+                const direction = this.player.lastDirectionFaced === 'left' ? -1 : 1;
+                this.spawnShuriken(this.player, direction);
+                this.player.pendingShurikenThrow = false;
             }
         });
 
@@ -332,17 +343,18 @@ class GameScene extends Phaser.Scene {
         });
 
         this.vKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V);
+
+        this.cKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
+
+        this.input.keyboard.on('keydown-C', () => {
+            this.player.shurikenRequested = true;
+        });
+
+        this.shurikens = [];
     }
 
     update() {
         if(this.gamePaused) return;
-
-        // For seeing rooms - TAKE OUT WHEN GOING LIVE: TODO
-        // if(Phaser.Input.Keyboard.JustDown(this.zoomKey)) {
-        //     this.debugZoomedOut = !this.debugZoomedOut;
-        //     this.cameras.main.setZoom(this.debugZoomedOut ? 0.3 : 1);
-        // }
-        // --------------------------------------------------
 
         // INTERACTION STUFFS
         const vKeyJustPressed = Phaser.Input.Keyboard.JustDown(this.vKey);
@@ -363,9 +375,12 @@ class GameScene extends Phaser.Scene {
             }
         });
 
-        // this.chests.forEach(chest => {
-        //     return chest.playerNearby = false;
-        // });
+        this.shurikens.forEach(shuriken => {
+            if(Math.abs(shuriken.x - shuriken.startX) >= this.player.shurikenMaxRange) {
+                shuriken.destroy();
+            }
+        });
+        this.shurikens = this.shurikens.filter(shuriken => shuriken.active);
 
         this.sageNinjas.forEach(ninja => {
             ninja.tryInteract(vKeyJustPressed, this.player);
@@ -465,7 +480,11 @@ class GameScene extends Phaser.Scene {
                         enemy.sprite.x, enemy.sprite.y,
                     );
 
-                    if(distance <= this.player.attackRange) {
+                    const enemyIsInFront = this.player.lastDirectionFaced === 'left'
+                        ? enemy.sprite.x <= this.player.sprite.x
+                        : enemy.sprite.x >= this.player.sprite.x;
+
+                    if(distance <= this.player.attackRange && enemyIsInFront) {
                         const totalDamage = this.player.baseDamage + this.player.bonusDamage;
                         enemy.takeDamage(totalDamage, this.player.sprite);
                         
@@ -476,7 +495,7 @@ class GameScene extends Phaser.Scene {
                         if(this.player.hasLifeDrain) {
                             this.player.heal(Math.round(totalDamage * this.player.lifeDrainPercent));
                         }
-                        
+
                         this.showHitEffect(enemy.sprite.x, enemy.sprite.y);
                         this.flashHit(enemy.sprite);
                     }
@@ -486,6 +505,14 @@ class GameScene extends Phaser.Scene {
             }
 
             this.player.attackRequested = false;
+
+            if(this.player.shurikenRequested && this.player.hasShuriken && !this.player.isAttacking) {
+                this.player.isAttacking = true;
+                this.player.pendingShurikenThrow = true;
+                this.player.sprite.play(this.player.lastDirectionFaced === 'left' ? 'ninja-throw-left' : 'ninja-throw-right', true);
+            }
+
+            this.player.shurikenRequested = false;
 
 
         }
@@ -747,6 +774,54 @@ class GameScene extends Phaser.Scene {
 
         this.physics.resume();
         this.gamePaused = false;
+    }
+
+    spawnShuriken(thrower, direction) {
+        const handOffsetX = 20;
+        const spawnX = thrower.sprite.x + (handOffsetX * direction);
+        const spawnY = thrower.sprite.y;
+
+        const shuriken = this.add.image(spawnX, spawnY, 'shuriken');
+        shuriken.startX = shuriken.x;
+
+        this.physics.add.existing(shuriken);
+        shuriken.body.setVelocityX(thrower.shurikenSpeed * direction);
+        shuriken.body.setAllowGravity(false);
+
+        this.tweens.add({
+            targets: shuriken,
+            angle: 360,
+            duration: 300,
+            repeat: -1,
+        });
+
+        this.physics.add.collider(shuriken, this.groundLayer, () => {
+            shuriken.destroy();
+            this.shurikens = this.shurikens.filter(shurikenToDestroy => shurikenToDestroy !== shuriken);
+        });
+
+        const isPlayerThrown = thrower === this.player;
+
+        if(isPlayerThrown) {
+            this.enemies.filter(enemy => enemy.alive).forEach(enemy => {
+                this.physics.add.overlap(shuriken, enemy.sprite, () => {
+                    const shurikenDamage = Math.round((thrower.baseDamage + thrower.bonusDamage) * thrower.shurikenDamageMultiplier);
+                    enemy.takeDamage(shurikenDamage, this.player.sprite);
+                    shuriken.destroy();
+                    this.shurikens = this.shurikens.filter(shurikenToDestroy => shurikenToDestroy !== shuriken);
+                });
+            });
+        }
+        else {
+            this.physics.add.overlap(shuriken, this.player.sprite, () => {
+                const shurikenDamage = Math.round((thrower.attackDamage + (thrower.bonusDamage || 0)) * thrower.shurikenDamageMultiplier);
+                this.player.takeDamage(shurikenDamage, thrower);
+                shuriken.destroy();
+                this.shurikens = this.shurikens.filter(shurikenToDestroy => shurikenToDestroy !== shuriken);
+            });
+        }
+
+        this.shurikens.push(shuriken);
     }
 
     // --------- PLATFORMS --------- //
