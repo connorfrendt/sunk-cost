@@ -44,14 +44,43 @@ export default class Player {
         this.alive = true;
         this.abilities = [];
         this.hasTickingDamage = false;
+        this.hasLifeDrain = false;
+        this.lifeDrainPercent = 0;
     }
 
     addBonusDamage(amount) {
         this.bonusDamage += amount;
     }
 
+    // This is for the player attacking the enemy
     enableTickingDamage() {
         this.hasTickingDamage = true;
+    }
+
+    // This is for the enemy attacking the player
+    applyTickingDamage(damagePerTick, intervalMs, tickCount) {
+        if(this.dotTimer) {
+            this.dotTimer.remove();
+        }
+
+        this.dotTimer = this.scene.time.addEvent({
+            delay: intervalMs,
+            repeat: tickCount - 1,
+            callback: () => {
+                if(!this.alive) {
+                    this.dotTimer.remove();
+                    return;
+                }
+
+                this.hp -= damagePerTick;
+                this.updateHpBar();
+
+                if(this.hp <= 0) {
+                    this.hp = 0;
+                    this.die();
+                }
+            }
+        })
     }
 
     takeDamage(amount) {
@@ -89,6 +118,11 @@ export default class Player {
                 this.sprite.setAlpha(1);
             });
         }
+    }
+
+    enableLifeDrain(percent) {
+        this.hasLifeDrain = true;
+        this.lifeDrainPercent = percent;
     }
 
     heal(amount) {

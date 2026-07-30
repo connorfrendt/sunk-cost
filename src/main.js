@@ -164,7 +164,7 @@ class GameScene extends Phaser.Scene {
 
         const roomWords = ['zero', 'one', 'two', 'three', 'four'];
 
-        [1, 2].forEach(roomNumber => {
+        [1, 2, 3].forEach(roomNumber => {
             this.bossRoomWallEntranceObj[roomNumber] = this.getRoomObject('boss-room-wall-entrance', roomNumber);
             this.bossRoomWallExitObj[roomNumber] = this.getRoomObject('boss-room-wall-exit', roomNumber);
             this.bossArenaCenter[roomNumber] = this.getObjectCenter(this.getRoomObject('boss-arena', roomNumber));
@@ -205,6 +205,11 @@ class GameScene extends Phaser.Scene {
 
         /*------------------------------------------ */
 
+        // ----------- UPGRADE STUFF ----------- //
+        this.availableUpgrades = [...cardData];
+        this.currentUpgradeOptions = [];
+        this.pendingBossUpgrades = [];
+
         // ----------- SAGE NINJA STUFF ----------- //
         this.sageNinjaPoints = this.spawnLayer.objects.filter(obj => obj.name === 'sage-ninja');
         this.sageNinjas = this.sageNinjaPoints.map(point => {
@@ -239,7 +244,12 @@ class GameScene extends Phaser.Scene {
             this.chests.push(chest);
         });
 
-        this.roomDifficulty = 1; // Room 1 = 1, Room 2 = 1.3, Room 3 = 1.6, etc. tune per room
+        this.roomDifficultyByRoom = {
+            1: 1.0,
+            2: 1.5,
+            3: 2.25,
+            4: 4.0,
+        }
 
         // Spawn First Enemy
         this.enemies = [];
@@ -247,6 +257,8 @@ class GameScene extends Phaser.Scene {
         enemySpawnPoints.forEach(point => {
             const aggroOnSight = point.properties?.find(property => property.name === 'aggroOnSight')?.value || false;
             const giveUpRange = point.properties?.find(property => property.name === 'giveUpRange')?.value || false;
+            const roomNumber = point.properties?.find(property => property.name === 'roomNumber')?.value || 1;
+            const roomDifficulty = this.roomDifficultyByRoom[roomNumber];
 
             this.spawnEnemy(point.x + point.width / 2, point.y + point.height / 2, this.scaledEnemyConfig({
                 name: 'Enemeanie',
@@ -254,7 +266,7 @@ class GameScene extends Phaser.Scene {
                 maxHp: 30,
                 aggroOnSight,
                 giveUpRange,
-            }));
+            }, roomDifficulty));
         });
 
         this.interactPrompt = this.add.text(0, 0, 'V - Interact', {
@@ -461,6 +473,10 @@ class GameScene extends Phaser.Scene {
                             enemy.applyTickingDamage(TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS, TICK_COUNT);
                         }
                         
+                        if(this.player.hasLifeDrain) {
+                            this.player.heal(Math.round(totalDamage * this.player.lifeDrainPercent));
+                        }
+                        
                         this.showHitEffect(enemy.sprite.x, enemy.sprite.y);
                         this.flashHit(enemy.sprite);
                     }
@@ -614,6 +630,8 @@ class GameScene extends Phaser.Scene {
         this.gamePaused = true;
         this.physics.pause();
 
+        this.currentUpgradeOptions = this.pickRandomItems(this.availableUpgrades, 2);
+
         const { width, height } = this.cameras.main;
 
         // Dark Overlay
@@ -654,7 +672,7 @@ class GameScene extends Phaser.Scene {
                 .setDepth(100)
                 .setInteractive({ useHandCursor: true });
             
-            const title = this.add.text(x, centerY - 60, cardData[i].title, {
+            const title = this.add.text(x, centerY - 60, this.currentUpgradeOptions[i].title, {
                 fontFamily: 'monospace',
                 fontSize: '20px',
                 color: '#fbbf24',
@@ -668,7 +686,7 @@ class GameScene extends Phaser.Scene {
                 .setScrollFactor(0)
                 .setDepth(101);
             
-            const desc = this.add.text(x, centerY + 10, cardData[i].desc, {
+            const desc = this.add.text(x, centerY + 10, this.currentUpgradeOptions[i].desc, {
                 fontFamily: 'monospace',
                 fontSize: '16px',
                 color: '#ffffff',
@@ -691,16 +709,25 @@ class GameScene extends Phaser.Scene {
     }
 
     chooseUpgrade(index) {
-        const chosenCard = cardData[index];
+        const chosenCard = this.currentUpgradeOptions[index];
+        const otherIndex = index === 0 ? 1 : 0;
+        const unchosenCard = this.currentUpgradeOptions[otherIndex];
 
-        // --- UPGRADE CHOICES HERE --- //
-        if(chosenCard.id === 'damage') {
-            this.player.addBonusDamage(chosenCard.amount);
-        }
+        // if(chosenCard.id === 'damage') {
+        //     this.player.addBonusDamage(chosenCard.amount);
+        // }
 
-        if(chosenCard.id === 'ticking') {
-            this.player.enableTickingDamage();
-        }
+        // if(chosenCard.id === 'ticking') {
+        //     this.player.enableTickingDamage();
+        // }
+
+        chosenCard.applyTo(this.player);
+
+        this.availableUpgrades = this.availableUpgrades.filter(
+            card => card.id !== chosenCard.id && card.id !== unchosenCard.id
+        );
+
+        this.pendingBossUpgrades.push(unchosenCard);
 
         if(this.currentEncounterWallTiles) {
             this.destroyWallTiles(this.currentEncounterWallTiles);
@@ -880,6 +907,8 @@ class GameScene extends Phaser.Scene {
             }),
         );
         boss.bossRoomNumber = roomNumber;
+
+        this.pendingBossUpgrades.forEach(card => card.applyTo(boss));
         
         this.bossRoomEnemies[roomNumber].push(boss);
         this.sealBossRoom(roomNumber);
@@ -926,15 +955,20 @@ class GameScene extends Phaser.Scene {
         };
     }
 
-    scaledEnemyConfig(baseConfig) {
+    scaledEnemyConfig(baseConfig, difficulty = 1) {
         return {
             ...baseConfig,
-            hp: Math.round(baseConfig.hp * this.roomDifficulty),
-            maxHp: Math.round(baseConfig.maxHp * this.roomDifficulty),
-            attackDamage: Math.round((baseConfig.attackDamage || 10) * this.roomDifficulty),
-            speed: Math.round((baseConfig || 80) * this.roomDifficulty),
-            attackInterval: Math.round((baseConfig.attackInterval || 1000) / this.roomDifficulty),
+            hp: Math.round(baseConfig.hp * difficulty),
+            maxHp: Math.round(baseConfig.maxHp * difficulty),
+            attackDamage: Math.round((baseConfig.attackDamage || 10) * difficulty),
+            speed: Math.round((baseConfig.speed || 80) * difficulty),
+            attackInterval: Math.round((baseConfig.attackInterval || 1000) / difficulty),
         }
+    }
+
+    pickRandomItems(pool, count) {
+        const shuffled = [...pool].sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, count);
     }
 }
 

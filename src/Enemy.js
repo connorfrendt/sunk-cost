@@ -1,3 +1,5 @@
+import { TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS, TICK_COUNT } from "./upgrades";
+
 export default class Enemy {
     constructor(scene, x, y, config) {
         this.scene = scene;
@@ -16,6 +18,8 @@ export default class Enemy {
         this.scale = config.scale || 1;
         this.isHurt = false;
         this.aggroOnSight = config.aggroOnSight || false;
+        this.hasLifeDrain = false;
+        this.lifeDrainPercent = 0;
 
         // Attacking
         this.isAttacking = false;
@@ -51,7 +55,16 @@ export default class Enemy {
                 );
 
                 if(distance <= this.stopRange) {
-                    this.pendingAttackTarget.takeDamage(this.attackDamage);
+                    const totalDamage = this.attackDamage + (this.bonusDamage || 0);
+                    this.pendingAttackTarget.takeDamage(totalDamage);
+
+                    if(this.hasTickingDamage) {
+                        this.pendingAttackTarget.applyTickingDamage(TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS, TICK_COUNT);
+                    }
+
+                    if(this.hasLifeDrain) {
+                        this.heal(Math.round(totalDamage * this.lifeDrainPercent));
+                    }
                 }
 
                 this.pendingAttackTarget = null;
@@ -198,6 +211,10 @@ export default class Enemy {
         }
     }
 
+    addBonusDamage(amount) {
+        this.bonusDamage = (this.bonusDamage || 0) + amount;
+    }
+
     takeDamage(amount, source) {
         if(!this.alive) {
             return;
@@ -226,6 +243,10 @@ export default class Enemy {
         }
     }
 
+    enableTickingDamage() {
+        this.hasTickingDamage = true;
+    }
+
     applyTickingDamage(damagePerTick, intervalMs, tickCount) {
         // Clear any existing dot timer first, so reapplying doesn't stack multiple times
         if(this.dotTimer) {
@@ -248,6 +269,16 @@ export default class Enemy {
                 }
             }
         })
+    }
+
+    enableLifeDrain(percent) {
+        this.hasLifeDrain = true;
+        this.lifeDrainPercent = percent;
+    }
+
+    heal(amount) {
+        this.hp = Math.min(this.hp + amount, this.maxHp);
+        this.updateHpBar();
     }
 
     knockback(source) {
