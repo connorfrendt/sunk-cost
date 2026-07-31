@@ -363,6 +363,7 @@ export default class Enemy {
     }
 
     die() {
+        this.scene.sound.play('enemy-dead', { volume: 0.4 });
         this.alive = false;
         this.sprite.stop();
         this.destroy();

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 
-import TitleScene from './Title.js';
+import TitleScene from './TitleScene.js';
 import ControlsScene from './Controls.js';
 
 import Player from './Player.js';
@@ -60,62 +60,90 @@ class GameScene extends Phaser.Scene {
         });
         this.load.tilemapTiledJSON('purple-map', '/assets/tilemaps/purple-map.json');
 
+        this.load.image('icon-damage', '/assets/icons/icon-damage.png');
+        this.load.image('icon-glasscannon', '/assets/icons/icon-glasscannon.png');
+        this.load.image('icon-lifedrain', '/assets/icons/icon-lifedrain.png');
+        this.load.image('icon-thorns', '/assets/icons/icon-thorns.png');
+        this.load.image('icon-shuriken', '/assets/icons/icon-shuriken.png');
+        this.load.image('icon-ticking', '/assets/icons/icon-ticking.png');
+
         this.load.audio('sage-ninja-line-1', '/assets/audio/sage-ninja-line-1.mp3');
         this.load.audio('sage-ninja-line-2', '/assets/audio/sage-ninja-line-2.mp3');
         this.load.audio('sage-ninja-line-3', '/assets/audio/sage-ninja-line-3.mp3');
         this.load.audio('end-boss-beg-taunt', '/assets/audio/end-boss-beg-taunt.mp3');
         this.load.audio('boss-taunt', '/assets/audio/boss-taunt.mp3');
+
+        this.load.audio('sword-miss', '/assets/audio/sword-miss.mp3');
+        this.load.audio('sword-hit', '/assets/audio/sword-hit.mp3');
+        this.load.audio('click', '/assets/audio/click.mp3');
+        this.load.audio('player-hit', '/assets/audio/player-hit.mp3');
+        this.load.audio('dungeon', '/assets/audio/dungeon.mp3');
+        this.load.audio('heal', '/assets/audio/heal.mp3');
+        this.load.audio('shuriken-miss', '/assets/audio/shuriken-miss.mp3');
+        this.load.audio('jump', '/assets/audio/jump.mp3');
+        this.load.audio('enemy-dead', '/assets/audio/enemy-dead.mp3');
     }
 
     create() {
+        this.gamePaused = false;
+        this.currentActiveBossRoom = null;
+
+        this.music = this.sound.add('dungeon', { loop: true, volume: 0.1 });
+        this.music.play();
+
         // Animation Creation
-        this.anims.create({ key: 'ninja-idle-left', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 8, end: 15 }), frameRate: 4, repeat: -1 });
-        this.anims.create({ key: 'ninja-idle-right', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 0, end: 7 }), frameRate: 4, repeat: -1 });
-        
-        this.anims.create({ key: 'sage-ninja-left', frames: this.anims.generateFrameNumbers('sage-ninja', { start: 0, end: 3 }), frameRate: 1, repeat: -1 });
-        this.anims.create({ key: 'sage-ninja-right', frames: this.anims.generateFrameNumbers('sage-ninja', { start: 4, end: 7 }), frameRate: 1, repeat: -1 });
-        
-        this.anims.create({ key: 'ninja-attack-left', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 0, end: 2 }), frameRate: 12, repeat: 0 });
-        this.anims.create({ key: 'ninja-attack-right', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 3, end: 5 }), frameRate: 12, repeat: 0 });
-        this.anims.create({ key: 'ninja-throw-left', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 6, end: 8 }), frameRate: 18, repeat: 0 });
-        this.anims.create({ key: 'ninja-throw-right', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 9, end: 11 }), frameRate: 18, repeat: 0 });
-        
-        this.anims.create({ key: 'enemy-idle-left', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 6, end: 11 }), frameRate: 3, repeat: -1 });
-        this.anims.create({ key: 'enemy-idle-right', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 0, end: 5 }), frameRate: 3, repeat: -1 });
-        
-        this.anims.create({ key: 'enemy-hurt-left', frames: this.anims.generateFrameNumbers('enemy-hurt', { start: 1, end: 1 }), frameRate: 4, repeat: 0 });
-        this.anims.create({ key: 'enemy-hurt-right', frames: this.anims.generateFrameNumbers('enemy-hurt', { start: 0, end: 0 }), frameRate: 4, repeat: 0 });
-
-        this.anims.create({
-            key: 'enemy-attack-right',
-            frames: [
-                { key: 'enemy-attack', frame: 0, duration: 50 },
-                { key: 'enemy-attack', frame: 1, duration: 50 },
-                { key: 'enemy-attack', frame: 2, duration: 500 }, // 500, the rest 50
-                { key: 'enemy-attack', frame: 3, duration: 50 },
-                { key: 'enemy-attack', frame: 4, duration: 50 },
-            ],
-            repeat: 0
-        });
-        this.anims.create({
-            key: 'enemy-attack-left',
-            frames: [
-                { key: 'enemy-attack', frame: 5, duration: 50 },
-                { key: 'enemy-attack', frame: 6, duration: 50 },
-                { key: 'enemy-attack', frame: 7, duration: 500 }, // 500, the rest 50
-                { key: 'enemy-attack', frame: 8, duration: 50 },
-                { key: 'enemy-attack', frame: 9, duration: 50 },
-            ],
-            repeat: 0
-        });
-
-        this.anims.create({ key: 'brazier', frames: this.anims.generateFrameNumbers('brazier', { start: 0, end: 11 }), frameRate: 6, repeat: -1 });
+        if(!this.anims.exists('ninja-idle-left')) {
+            this.anims.create({ key: 'ninja-idle-left', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 8, end: 15 }), frameRate: 4, repeat: -1 });
+            this.anims.create({ key: 'ninja-idle-right', frames: this.anims.generateFrameNumbers('ninja-idle', { start: 0, end: 7 }), frameRate: 4, repeat: -1 });
+            
+            this.anims.create({ key: 'sage-ninja-left', frames: this.anims.generateFrameNumbers('sage-ninja', { start: 0, end: 3 }), frameRate: 1, repeat: -1 });
+            this.anims.create({ key: 'sage-ninja-right', frames: this.anims.generateFrameNumbers('sage-ninja', { start: 4, end: 7 }), frameRate: 1, repeat: -1 });
+            
+            this.anims.create({ key: 'ninja-attack-left', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 0, end: 2 }), frameRate: 12, repeat: 0 });
+            this.anims.create({ key: 'ninja-attack-right', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 3, end: 5 }), frameRate: 12, repeat: 0 });
+            this.anims.create({ key: 'ninja-throw-left', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 6, end: 8 }), frameRate: 18, repeat: 0 });
+            this.anims.create({ key: 'ninja-throw-right', frames: this.anims.generateFrameNumbers('ninja-attack', {start: 9, end: 11 }), frameRate: 18, repeat: 0 });
+            
+            this.anims.create({ key: 'enemy-idle-left', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 6, end: 11 }), frameRate: 3, repeat: -1 });
+            this.anims.create({ key: 'enemy-idle-right', frames: this.anims.generateFrameNumbers('enemy-idle', { start: 0, end: 5 }), frameRate: 3, repeat: -1 });
+            
+            this.anims.create({ key: 'enemy-hurt-left', frames: this.anims.generateFrameNumbers('enemy-hurt', { start: 1, end: 1 }), frameRate: 4, repeat: 0 });
+            this.anims.create({ key: 'enemy-hurt-right', frames: this.anims.generateFrameNumbers('enemy-hurt', { start: 0, end: 0 }), frameRate: 4, repeat: 0 });
+    
+            this.anims.create({
+                key: 'enemy-attack-right',
+                frames: [
+                    { key: 'enemy-attack', frame: 0, duration: 50 },
+                    { key: 'enemy-attack', frame: 1, duration: 50 },
+                    { key: 'enemy-attack', frame: 2, duration: 500 },
+                    { key: 'enemy-attack', frame: 3, duration: 50 },
+                    { key: 'enemy-attack', frame: 4, duration: 50 },
+                ],
+                repeat: 0
+            });
+            this.anims.create({
+                key: 'enemy-attack-left',
+                frames: [
+                    { key: 'enemy-attack', frame: 5, duration: 50 },
+                    { key: 'enemy-attack', frame: 6, duration: 50 },
+                    { key: 'enemy-attack', frame: 7, duration: 500 },
+                    { key: 'enemy-attack', frame: 8, duration: 50 },
+                    { key: 'enemy-attack', frame: 9, duration: 50 },
+                ],
+                repeat: 0
+            });
+    
+            this.anims.create({ key: 'brazier', frames: this.anims.generateFrameNumbers('brazier', { start: 0, end: 11 }), frameRate: 6, repeat: -1 });
+        }
 
         // Create Map
         const map = this.make.tilemap({ key: 'purple-map' });
         const purpleTileSet = map.addTilesetImage('purple-tileset', 'purple-tileset');
         this.groundLayer = map.createLayer('Tile Layer 1', purpleTileSet, 0, 0);
         this.groundLayer.setCollisionByProperty({ collides: true });
+
+        this.runStartTime = this.time.now;
+        this.finalTime = null;
 
         // Grabs all the object spawns in from Tiled
         this.spawnLayer = map.getObjectLayer('Spawn Layer');
@@ -129,7 +157,7 @@ class GameScene extends Phaser.Scene {
         this.player.sprite.body.setSize(25, 32);
         this.player.sprite.body.setCollideWorldBounds(true);
 
-        this.sound.play('end-boss-beg-taunt');
+        this.sound.play('end-boss-beg-taunt', { volume: 0.7 });
         const { width, height } = this.cameras.main;
         const spawnSubtitle = this.add.text(width / 2, 80, 'Mmm, fresh meat... everyone pays eventually.  Let\'s see what you\'re willing to lose...', {
             fontFamily: 'monospace',
@@ -151,7 +179,7 @@ class GameScene extends Phaser.Scene {
             yoyo: true,
             hold: 8000,
             onComplete: () => spawnSubtitle.destroy(),
-        })
+        });
 
         const spikesTileset = map.addTilesetImage('spikes', 'spikes');
         this.spikesLayer = map.createLayer('Spikes Layer', spikesTileset, 0, 0);
@@ -242,6 +270,7 @@ class GameScene extends Phaser.Scene {
         this.availableUpgrades = [...cardData];
         this.currentUpgradeOptions = [];
         this.pendingBossUpgrades = [];
+        this.powerIcons = [];
 
         // ----------- SAGE NINJA STUFF ----------- //
         this.sageNinjaPoints = this.spawnLayer.objects.filter(obj => obj.name === 'sage-ninja');
@@ -281,14 +310,14 @@ class GameScene extends Phaser.Scene {
             1: 1.0,
             2: 1.5,
             3: 2.0,
-            4: 3.0,
+            4: 2.5,
         }
 
         this.bossDamageMultiplierByRoom = {
             1: 1.0,
-            2: 1.3,
-            3: 1.5,
-            4: 1.8,
+            2: 1.2,
+            3: 1.4,
+            4: 1.6,
         }
 
         // Spawn First Enemy
@@ -409,6 +438,7 @@ class GameScene extends Phaser.Scene {
 
             if(vKeyJustPressed) {
                 this.openChest(chest);
+                this.sound.play('heal', { volume: 0.3 });
             }
         });
 
@@ -477,10 +507,20 @@ class GameScene extends Phaser.Scene {
                 let targetVelocityX = this.player.sprite.body.velocity.x; // default: keep current momentum
                 
                 if(this.cursors.left.isDown || this.wasd.A.isDown) {
+                    this.player.lastDirectionFaced = 'left';
                     targetVelocityX = -this.player.speed;
+
+                    if(!this.player.isAttacking) {
+                        this.player.sprite.play('ninja-idle-left', true);
+                    }
                 }
                 else if (this.cursors.right.isDown || this.wasd.D.isDown) {
+                    this.player.lastDirectionFaced = 'right';
                     targetVelocityX = this.player.speed;
+
+                    if(!this.player.isAttacking) {
+                        this.player.sprite.play('ninja-idle-right', true);
+                    }
                 }
 
                 const currentVelocityX = this.player.sprite.body.velocity.x;
@@ -494,6 +534,7 @@ class GameScene extends Phaser.Scene {
 
             if(jumpKeyJustPressed && this.player.sprite.body.blocked.down) {
                 this.player.sprite.body.setVelocityY(-750);
+                this.sound.play('jump');
             }
 
             if(!jumpKeyDown && this.player.sprite.body.velocity.y < 0) {
@@ -511,6 +552,8 @@ class GameScene extends Phaser.Scene {
                 this.player.sprite.play(this.player.lastDirectionFaced === 'left' ? 'ninja-attack-left' : 'ninja-attack-right', true);
                 
                 const aliveEnemies = this.enemies.filter(enemy => enemy.alive);
+                let hitSomething = false;
+
                 aliveEnemies.forEach(enemy => {
                     const distance = Phaser.Math.Distance.Between(
                         this.player.sprite.x, this.player.sprite.y,
@@ -524,7 +567,10 @@ class GameScene extends Phaser.Scene {
                     if(distance <= this.player.attackRange && enemyIsInFront) {
                         const totalDamage = (this.player.baseDamage + this.player.bonusDamage) * (this.player.damageMultiplier || 1);
                         enemy.takeDamage(totalDamage, this.player.sprite);
-                        
+                        let hitSomething = true;
+
+                        this.sound.play('sword-hit', { volume: 0.3 });
+
                         if(this.player.hasTickingDamage) {
                             enemy.applyTickingDamage(TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS, TICK_COUNT);
                         }
@@ -537,6 +583,10 @@ class GameScene extends Phaser.Scene {
                         this.flashHit(enemy.sprite);
                     }
                 });
+
+                if(!hitSomething) {
+                    this.sound.play('sword-miss', { volume: 0.4 });
+                }
 
                 this.player.attackCooldown = this.player.attackCooldownDuration;
             }
@@ -592,6 +642,67 @@ class GameScene extends Phaser.Scene {
         });
     }
 
+    // ------------------ MISC ------------------- //
+    showWinScreen() {
+        this.gamePaused = true;
+        this.physics.pause();
+
+        this.finalTime = this.time.now - this.runStartTime;
+        console.log('time.now:', this.time.now, 'runStartTime:', this.runStartTime, 'finalTime:', this.finalTime);
+        const totalSeconds = Math.floor(this.finalTime / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        const { width, height } = this.cameras.main;
+        const zoom = this.cameras.main.zoom;
+
+        this.add.rectangle(width / 2, height / 2, width / zoom, height / zoom, 0x000000, 1)
+            .setScrollFactor(0)
+            .setDepth(200);
+        
+        this.add.text(width / 2, height / 2 - 30, 'YOU WIN', {
+            fontFamily: 'monospace',
+            fontSize: '32px',
+            color: '#ffffff',
+            resolution: 3,
+        })
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(201);
+        
+        this.add.text(width / 2, height / 2 + 20, `YOUR TIME: ${formattedTime}`, {
+            fontFamily: 'monospace',
+            fontSize: '18px',
+            color: '#fbbf24',
+            resolution: 3,
+        })
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(201);
+
+        const restartButton = this.add.text(width / 2, height / 2 + 70, 'RESTART', {
+            fontFamily: 'monospace',
+            fontSize: '18px',
+            color: '#ffffff',
+            backgroundColor: '#333333',
+            padding: { x: 12, y: 6 },
+            resolution: 3,
+        })
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(201)
+            .setInteractive({ useHandCursor: true });
+
+        restartButton.on('pointerdown', () => {
+            this.music.stop();
+            this.scene.start('TitleScene');
+        });
+
+        restartButton.on('pointerover', () => restartButton.setColor('#fbbf24'));
+        restartButton.on('pointerout', () => restartButton.setColor('#ffffff'));
+    }
+
     // ------------------ INTERACTIONS ------------------- //
     openChest(chest) {
         chest.isOpen = true;
@@ -620,12 +731,21 @@ class GameScene extends Phaser.Scene {
         
             if(this.bossRoomEnemies[roomNumber].length === 0) {
                 this.bossRoomExitWallTiles[roomNumber].forEach(tile => tile.destroy());
-                this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
+                
+                this.cameras.main.pan(this.player.sprite.x, this.player.sprite.y, 600, 'Sine.easeInOut', false, (camera, progress) => {
+                    if(progress === 1) {
+                        this.cameras.main.startFollow(this.player.sprite, true, 0.1, 0.1);
+                    }
+                });
+
                 this.bossRoomEntered[roomNumber] = false;
                 this.bossRoomEnemies[roomNumber] = null;
                 this.bossDefeated[roomNumber] = true;
                 this.currentActiveBossRoom = null;
-                // TODO: if time, put in pan/zoomTo transition
+
+                if(roomNumber === 4) {
+                    this.showWinScreen();
+                }
             }
         }
     }
@@ -675,8 +795,6 @@ class GameScene extends Phaser.Scene {
             .setOrigin(0.5)
             .setScrollFactor(0)
             .setDepth(101);
-
-        // this.sound.play(`sage-ninja-line-${Math.min(lineIndex, sageNinjaDialogueLines.length - 1)}`);
 
         this.input.keyboard.once('keydown-SPACE', () => {
             this.dialogueOverlay.destroy();
@@ -730,12 +848,17 @@ class GameScene extends Phaser.Scene {
         ];
 
         this.upgradeCards = xPositions.map((x, i) => {
+            const card = this.currentUpgradeOptions[i];
+
             const bg = this.add.rectangle(x, centerY, cardWidth, cardHeight, 0x2a2a3a)
                 .setStrokeStyle(2, 0x4a4a5a)
                 .setScrollFactor(0)
                 .setDepth(100)
                 .setInteractive({ useHandCursor: true });
             
+            const icon = this.add.image(x, centerY - 90, `icon-${card.id}`)
+                .setOrigin(0.5);
+                
             const title = this.add.text(x, centerY - 60, this.currentUpgradeOptions[i].title, {
                 fontFamily: 'monospace',
                 fontSize: '20px',
@@ -766,7 +889,7 @@ class GameScene extends Phaser.Scene {
             
             bg.on('pointerdown', () => this.chooseUpgrade(i));
 
-            return { bg, title, desc };
+            return { bg, icon, title, desc };
         });
 
         // destroy corridor
@@ -777,11 +900,44 @@ class GameScene extends Phaser.Scene {
         const otherIndex = index === 0 ? 1 : 0;
         const unchosenCard = this.currentUpgradeOptions[otherIndex];
 
+        if(this.pendingBossUpgrades.length === 0) {
+            this.sound.play('boss-taunt', { volume: 0.7 });
+
+            const { width, height } = this.cameras.main;
+            const spawnSubtitle = this.add.text(width / 2, 80, 'Oh you\'ve gotten more powerful, what ever shall I do?', {
+                fontFamily: 'monospace',
+                fontSize: '14px',
+                color: '#ffffff',
+                align: 'center',
+                resolution: 3,
+                wordWrap: { width: width - 80 },
+            })
+                .setOrigin(0.5)
+                .setScrollFactor(0)
+                .setDepth(60)
+                .setAlpha(0);
+            
+            this.tweens.add({
+                targets: spawnSubtitle,
+                alpha: 1,
+                duration: 500,
+                yoyo: true,
+                hold: 4000,
+                onComplete: () => spawnSubtitle.destroy(),
+            });
+        }
+
         chosenCard.applyTo(this.player);
 
         this.availableUpgrades = this.availableUpgrades.filter(
             card => card.id !== chosenCard.id && card.id !== unchosenCard.id
         );
+        
+        chosenCard.applyTo(this.player);
+
+        this.sound.play('click');
+
+        this.updatePowerDisplay();
 
         this.pendingBossUpgrades.push(unchosenCard);
 
@@ -790,8 +946,9 @@ class GameScene extends Phaser.Scene {
             this.currentEncounterWallTiles = null;
         }
 
-        this.upgradeCards.forEach(({ bg, title, desc }) => {
+        this.upgradeCards.forEach(({ bg, icon, title, desc }) => {
             bg.destroy();
+            icon.destroy();
             title.destroy();
             desc.destroy();
         });
@@ -806,6 +963,7 @@ class GameScene extends Phaser.Scene {
     }
 
     spawnShuriken(thrower, direction) {
+        this.sound.play('shuriken-miss', { volume: 0.3 });
         const handOffsetX = 20;
         const spawnX = thrower.sprite.x + (handOffsetX * direction);
         const spawnY = thrower.sprite.y;
@@ -869,6 +1027,31 @@ class GameScene extends Phaser.Scene {
         }
 
         this.shurikens.push(shuriken);
+    }
+
+    updatePowerDisplay() {
+        this.powerIcons.forEach(icon => icon.destroy());
+        this.powerIcons = [];
+
+        const activeChecks = [
+            { id: 'damage', active: this.player.bonusDamage > 0 },
+            { id: 'ticking', active: this.player.hasTickingDamage },
+            { id: 'lifedrain', active: this.player.hasLifeDrain },
+            { id: 'thorns', active: this.player.hasThorns },
+            { id: 'shuriken', active: this.player.hasShuriken },
+            { id: 'glasscannon', active: this.player.damageMultiplier > 1 },
+        ];
+
+        const active = activeChecks.filter(check => check.active);
+
+        active.forEach((check, index) => {
+            const icon = this.add.image(20 + (index * 35), 60, `icon-${check.id}`)
+                .setScrollFactor(0)
+                .setDepth(1000)
+                .setDisplaySize(32, 32);
+
+            this.powerIcons.push(icon);
+        });
     }
 
     // --------- PLATFORMS --------- //

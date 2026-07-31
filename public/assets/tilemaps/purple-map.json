@@ -1895,14 +1895,14 @@
                 }, 
                 {
                  "height":33,
-                 "id":140,
+                 "id":142,
                  "name":"player-spawn",
                  "opacity":1,
                  "rotation":0,
                  "type":"",
                  "visible":true,
                  "width":33,
-                 "x":71.125,
+                 "x":72.25,
                  "y":3150.25
                 }],
          "opacity":1,
@@ -1912,7 +1912,7 @@
          "y":0
         }],
  "nextlayerid":4,
- "nextobjectid":141,
+ "nextobjectid":143,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.2",

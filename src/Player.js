@@ -50,8 +50,8 @@ export default class Player {
         this.thornsPercent = 0;
         this.hasShuriken = false;
         this.shurikenDamageMultiplier = 0.75;
-        this.shurikenSpeed = 400;
-        this.shurikenMaxRange = 150;
+        this.shurikenSpeed = 600;
+        this.shurikenMaxRange = 450;
     }
 
     addBonusDamage(amount) {
@@ -98,6 +98,7 @@ export default class Player {
         }
         
         this.hp -= amount;
+        this.scene.sound.play('player-hit');
         this.updateHpBar();
         
         if(this.hp <= 0) {
@@ -171,6 +172,8 @@ export default class Player {
 
     die() {
         this.alive = false;
+        this.isAttacking = false;
+        this.pendingShurikenThrow = false;
         this.sprite.body.setVelocity(0, 0);
         this.sprite.anims.stop();
         this.sprite.play(this.lastDirectionFaced === 'left' ? 'ninja-idle-left' : 'ninja-idle-right', true);
