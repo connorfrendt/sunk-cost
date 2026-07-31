@@ -8,7 +8,8 @@ export const LIFE_DRAIN_PERCENT = 0.10;
 
 export const THORNS_PERCENT = 0.5;
 
-export const GLASS_CANNON
+export const GLASS_CANNON_DAMAGE_MULTIPLIER = 2;
+export const GLASS_CANNON_HP_MULTIPLIER = 0.5;
 
 export const cardData = [
     {
@@ -27,8 +28,8 @@ export const cardData = [
     {
         id: 'glasscannon',
         title: 'GLASS CANNON',
-        desc: 'Deal twice the damage, but ',
-        applyTo: (target) => console.log(target),
+        desc: 'Deal twice the damage, but halve your max HP',
+        applyTo: (target) => target.enableGlassCannon(GLASS_CANNON_DAMAGE_MULTIPLIER, GLASS_CANNON_HP_MULTIPLIER),
     },
     {
         id: 'shuriken',

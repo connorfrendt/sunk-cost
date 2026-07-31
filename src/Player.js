@@ -151,6 +151,13 @@ export default class Player {
         this.hasShuriken = true;
     }
 
+    enableGlassCannon(damageMultiplier, hpMultiplier) {
+        this.damageMultiplier = damageMultiplier;
+        this.maxHp = Math.round(this.maxHp * hpMultiplier);
+        this.hp = Math.min(this.hp, this.maxHp);
+        this.updateHpBar();
+    }
+
     heal(amount) {
         this.hp = Math.min(this.hp + amount, this.maxHp);
         this.updateHpBar();

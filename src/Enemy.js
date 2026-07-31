@@ -68,7 +68,7 @@ export default class Enemy {
                     }
 
                     else if(distance <= this.stopRange) {
-                        const totalDamage = this.attackDamage + (this.bonusDamage || 0);
+                        const totalDamage = (this.attackDamage + (this.bonusDamage || 0)) * (this.damageMultiplier || 1);
                         this.pendingAttackTarget.takeDamage(totalDamage, this);
     
                         if(this.hasTickingDamage) {
@@ -314,6 +314,13 @@ export default class Enemy {
 
     enableShuriken() {
         this.hasShuriken = true;
+    }
+
+    enableGlassCannon(damageMultiplier, hpMultiplier) {
+        this.damageMultiplier = damageMultiplier;
+        this.maxHp = Math.round(this.maxHp * hpMultiplier);
+        this.hp = Math.min(this.hp, this.maxHp);
+        this.updateHpBar();
     }
 
     heal(amount) {

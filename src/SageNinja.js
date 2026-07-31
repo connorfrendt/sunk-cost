@@ -35,6 +35,17 @@ export default class SageNinja {
 
     triggerDialogue() {
         this.hasBeenTalkedTo = true;
+
+        if(this.scene.sageNinjaEncounterCount === 0) {
+            this.scene.sound.play('sage-ninja-line-1');
+        }
+        if(this.scene.sageNinjaEncounterCount === 1) {
+            this.scene.sound.play('sage-ninja-line-2');
+        }
+        if(this.scene.sageNinjaEncounterCount === 2) {
+            this.scene.sound.play('sage-ninja-line-3');
+        }
+
         this.scene.currentEncounterWallTiles = this.wallTiles;
         this.scene.showDialogue(this.scene.sageNinjaEncounterCount);
         this.scene.sageNinjaEncounterCount++;

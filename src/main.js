@@ -59,6 +59,12 @@ class GameScene extends Phaser.Scene {
             frameHeight: 16,
         });
         this.load.tilemapTiledJSON('purple-map', '/assets/tilemaps/purple-map.json');
+
+        this.load.audio('sage-ninja-line-1', '/assets/audio/sage-ninja-line-1.mp3');
+        this.load.audio('sage-ninja-line-2', '/assets/audio/sage-ninja-line-2.mp3');
+        this.load.audio('sage-ninja-line-3', '/assets/audio/sage-ninja-line-3.mp3');
+        this.load.audio('end-boss-beg-taunt', '/assets/audio/end-boss-beg-taunt.mp3');
+        this.load.audio('boss-taunt', '/assets/audio/boss-taunt.mp3');
     }
 
     create() {
@@ -123,6 +129,30 @@ class GameScene extends Phaser.Scene {
         this.player.sprite.body.setSize(25, 32);
         this.player.sprite.body.setCollideWorldBounds(true);
 
+        this.sound.play('end-boss-beg-taunt');
+        const { width, height } = this.cameras.main;
+        const spawnSubtitle = this.add.text(width / 2, 80, 'Mmm, fresh meat... everyone pays eventually.  Let\'s see what you\'re willing to lose...', {
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            color: '#ffffff',
+            align: 'center',
+            resolution: 3,
+            wordWrap: { width: width - 80 },
+        })
+            .setOrigin(0.5)
+            .setScrollFactor(0)
+            .setDepth(60)
+            .setAlpha(0);
+        
+        this.tweens.add({
+            targets: spawnSubtitle,
+            alpha: 1,
+            duration: 500,
+            yoyo: true,
+            hold: 8000,
+            onComplete: () => spawnSubtitle.destroy(),
+        })
+
         const spikesTileset = map.addTilesetImage('spikes', 'spikes');
         this.spikesLayer = map.createLayer('Spikes Layer', spikesTileset, 0, 0);
         this.spikesLayer.setCollisionByProperty({ damage: true });
@@ -167,7 +197,7 @@ class GameScene extends Phaser.Scene {
 
         const roomWords = ['zero', 'one', 'two', 'three', 'four'];
 
-        [1, 2, 3].forEach(roomNumber => {
+        [1, 2, 3, 4].forEach(roomNumber => {
             this.bossRoomWallEntranceObj[roomNumber] = this.getRoomObject('boss-room-wall-entrance', roomNumber);
             this.bossRoomWallExitObj[roomNumber] = this.getRoomObject('boss-room-wall-exit', roomNumber);
             this.bossArenaCenter[roomNumber] = this.getObjectCenter(this.getRoomObject('boss-arena', roomNumber));
@@ -250,8 +280,15 @@ class GameScene extends Phaser.Scene {
         this.roomDifficultyByRoom = {
             1: 1.0,
             2: 1.5,
-            3: 2.25,
-            4: 4.0,
+            3: 2.0,
+            4: 3.0,
+        }
+
+        this.bossDamageMultiplierByRoom = {
+            1: 1.0,
+            2: 1.3,
+            3: 1.5,
+            4: 1.8,
         }
 
         // Spawn First Enemy
@@ -485,7 +522,7 @@ class GameScene extends Phaser.Scene {
                         : enemy.sprite.x >= this.player.sprite.x;
 
                     if(distance <= this.player.attackRange && enemyIsInFront) {
-                        const totalDamage = this.player.baseDamage + this.player.bonusDamage;
+                        const totalDamage = (this.player.baseDamage + this.player.bonusDamage) * (this.player.damageMultiplier || 1);
                         enemy.takeDamage(totalDamage, this.player.sprite);
                         
                         if(this.player.hasTickingDamage) {
@@ -740,14 +777,6 @@ class GameScene extends Phaser.Scene {
         const otherIndex = index === 0 ? 1 : 0;
         const unchosenCard = this.currentUpgradeOptions[otherIndex];
 
-        // if(chosenCard.id === 'damage') {
-        //     this.player.addBonusDamage(chosenCard.amount);
-        // }
-
-        // if(chosenCard.id === 'ticking') {
-        //     this.player.enableTickingDamage();
-        // }
-
         chosenCard.applyTo(this.player);
 
         this.availableUpgrades = this.availableUpgrades.filter(
@@ -805,8 +834,17 @@ class GameScene extends Phaser.Scene {
         if(isPlayerThrown) {
             this.enemies.filter(enemy => enemy.alive).forEach(enemy => {
                 this.physics.add.overlap(shuriken, enemy.sprite, () => {
-                    const shurikenDamage = Math.round((thrower.baseDamage + thrower.bonusDamage) * thrower.shurikenDamageMultiplier);
+                    const shurikenDamage = Math.round((thrower.baseDamage + thrower.bonusDamage) * thrower.shurikenDamageMultiplier * (thrower.damageMultiplier || 1));
                     enemy.takeDamage(shurikenDamage, this.player.sprite);
+
+                    if(thrower.hasLifeDrain) {
+                        thrower.heal(Math.round(shurikenDamage * thrower.lifeDrainPercent));
+                    }
+
+                    if(thrower.hasTickingDamage) {
+                        enemy.applyTickingDamage(TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS, TICK_COUNT);
+                    }
+
                     shuriken.destroy();
                     this.shurikens = this.shurikens.filter(shurikenToDestroy => shurikenToDestroy !== shuriken);
                 });
@@ -814,8 +852,17 @@ class GameScene extends Phaser.Scene {
         }
         else {
             this.physics.add.overlap(shuriken, this.player.sprite, () => {
-                const shurikenDamage = Math.round((thrower.attackDamage + (thrower.bonusDamage || 0)) * thrower.shurikenDamageMultiplier);
+                const shurikenDamage = Math.round((thrower.attackDamage + (thrower.bonusDamage || 0)) * thrower.shurikenDamageMultiplier * (thrower.damageMultiplier || 1));
                 this.player.takeDamage(shurikenDamage, thrower);
+
+                if(thrower.hasLifeDrain) {
+                    thrower.heal(Math.round(shurikenDamage * thrower.lifeDrainPercent));
+                }
+
+                if(thrower.hasTickingDamage) {
+                    this.player.applyTickingDamage(TICK_DAMAGE_AMOUNT, TICK_INTERVAL_MS, TICK_COUNT);
+                }
+
                 shuriken.destroy();
                 this.shurikens = this.shurikens.filter(shurikenToDestroy => shurikenToDestroy !== shuriken);
             });
@@ -979,7 +1026,7 @@ class GameScene extends Phaser.Scene {
                 chaseRange: 1000,
                 giveUpRange: 1000,
                 scale: 2,
-            }),
+            }, this.roomDifficultyByRoom[roomNumber], this.bossDamageMultiplierByRoom[roomNumber]),
         );
         boss.bossRoomNumber = roomNumber;
 
@@ -1030,12 +1077,12 @@ class GameScene extends Phaser.Scene {
         };
     }
 
-    scaledEnemyConfig(baseConfig, difficulty = 1) {
+    scaledEnemyConfig(baseConfig, difficulty = 1, damageMultiplier = difficulty) {
         return {
             ...baseConfig,
             hp: Math.round(baseConfig.hp * difficulty),
             maxHp: Math.round(baseConfig.maxHp * difficulty),
-            attackDamage: Math.round((baseConfig.attackDamage || 10) * difficulty),
+            attackDamage: Math.round((baseConfig.attackDamage || 10) * damageMultiplier),
             speed: Math.round((baseConfig.speed || 80) * difficulty),
             attackInterval: Math.round((baseConfig.attackInterval || 1000) / difficulty),
         }
